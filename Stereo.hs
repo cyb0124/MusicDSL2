@@ -4,6 +4,14 @@ module Stereo(Stereo(..), dB, mono, pan) where
 
 data Stereo = Stereo {lChn :: Float, rChn :: Float} deriving Show
 
+instance Num Stereo where
+  (Stereo a b) + (Stereo c d) = Stereo (a + c) (b + d)
+  (Stereo a b) * (Stereo c d) = Stereo (a * c) (b * d)
+  abs (Stereo a b) = Stereo (abs a) (abs b)
+  signum (Stereo a b) = Stereo (signum a) (signum b)
+  fromInteger x = mono $ fromInteger x
+  negate (Stereo a b) = Stereo (negate a) (negate b)
+
 -- Decibel to linear scale
 dB x = 10 ** (x / 20)
 

@@ -1,22 +1,30 @@
 -- This file defines the musical notation eDSL
 -- For the instrument specification language, see Instrument.hs
 
+{-# LANGUAGE Arrows #-}
+
 module Music(
-  Time, Music, key, mode, bpm, transpose, rest, tone, note
+  Time, Music, key, mode, bpm, transpose, rest, tone, note, inst,
+  Event(..), TimedEvent(..), BPMChange(..), Note(..),
+  compileMusic
 ) where
 import Control.Monad.Writer.Lazy
 import Control.Monad.State.Lazy
+import Control.Arrow
+import Data.Functor.Identity
 import Data.Monoid
 import Data.Ratio
+import Data.List (sortOn)
 import Instrument
+import Stereo
 import Theory
 import Parser hiding (transpose)
 
 -- The type of musical time (number of beats)
 type Time = Ratio Int
 
-type MusicWriter = Writer [TimedEvent]
-data TimedEvent = TimedEvent Time Event
+type MusicWriterT = WriterT [TimedEvent]
+data TimedEvent = TimedEvent {teTime :: Time, teEvent :: Event}
 data Event = EvBPMChange BPMChange | EvNote Note
 data BPMChange = BPMChange Float deriving Show
 data Note = Note {
@@ -27,7 +35,7 @@ data Note = Note {
 
 -- The music monad contains a writer for recording the notes and a state for
 -- keep tracking of the local state.
-type Music = StateT MusicState MusicWriter
+type MusicStateT = StateT MusicState
 data MusicState = MusicState {
     nsTime :: Time,    -- Current time
     nsKey :: Int,      -- Current key
@@ -35,6 +43,8 @@ data MusicState = MusicState {
     nsBPM :: Float,    -- Current tempo
     nsInst :: InstProc -- Current instrument
   }
+
+type Music = MusicWriterT (MusicStateT Identity)
 
 tellTimed :: Event -> Music ()
 tellTimed x = do
@@ -50,6 +60,11 @@ mode :: Mode -> Music ()
 mode x = do
   now <- get
   put $ now {nsMode = x}
+
+inst :: Inst () Stereo -> Music ()
+inst x = do
+  now <- get
+  put $ now {nsInst = compileInst x}
 
 bpm :: Float -> Music ()
 bpm x = do
@@ -79,3 +94,17 @@ note :: Pitch p => Time -> p -> Music ()
 note duration p = do
   tone duration p
   rest duration
+
+-- produce the final event list
+compileMusic :: Music () -> [TimedEvent]
+compileMusic m =
+  let
+    s = execWriterT m
+    e = runIdentity $ evalStateT s $ MusicState {
+        nsTime = 0,
+        nsKey = 0,
+        nsMode = Major,
+        nsBPM = 128,
+        nsInst = compileInst $ proc () -> do returnA -< Stereo 0 0
+      }
+  in sortOn teTime e
