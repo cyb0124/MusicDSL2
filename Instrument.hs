@@ -9,13 +9,14 @@ module Instrument(
 ) where
 import Prelude hiding ((.))
 import Control.Category
-import Control.Arrow
+import Control.Arrow hiding (second)
 import Control.Applicative
 import Control.Monad.ST
 import Control.Monad.State.Lazy
 import Unsafe.Coerce
 import Data.Array.ST
 import Data.Array.MArray
+import Data.Bifunctor
 import Stereo
 
 -- A context accessible by instrument procedures during each sample
@@ -65,7 +66,7 @@ data InstProc = InstProc {
 
 -- Assign state indices and collect initial states
 gatherStates :: Inst a b -> (Inst a b, [Box])
-gatherStates p = runState (f p) [] where
+gatherStates p = second reverse $ runState (f p) [] where
   f :: Inst a b -> State [Box] (Inst a b)
   f p = case p of
     InstId -> return p
