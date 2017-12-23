@@ -63,7 +63,7 @@ evTranspose = do
   return $ lift $ M.transpose offset
 
 -- Event
-event = evRatio <|> rest <|> up <|> down <|> chord <|> evNote <|> evTranspose
+event = try evRatio <|> evNote <|> rest <|> up <|> down <|> chord <|> evTranspose
 events = foldl (>>) (return ()) <$> sepBy1 event spaces
 
 -- Exported function

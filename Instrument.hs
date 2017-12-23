@@ -5,7 +5,7 @@
 
 module Instrument(
   InstCtx(..), Inst, InstProc(..),
-  feedback, time, gate, pitch, compileInst, Box
+  feedback, sampFreq, time, gate, pitch, compileInst, Box
 ) where
 import Prelude hiding ((.))
 import Control.Category
@@ -21,10 +21,10 @@ import Stereo
 
 -- A context accessible by instrument procedures during each sample
 data InstCtx = MkInstCtx {
-    icFS :: Float,     -- Sampling frequency
-    icTime :: Float, -- Current time (number of beats elapsed)
-    icGate :: Bool,  -- Whether the key is pressed
-    icPitch :: Int   -- Current note (number of semitones from A4)
+    icFS :: Double,   -- Sampling frequency
+    icTime :: Double, -- Current time (number of beats elapsed)
+    icGate :: Bool,   -- Whether the key is pressed
+    icPitch :: Int    -- Current note (number of semitones from A4)
   }
 
 -- Instrument procedure AST

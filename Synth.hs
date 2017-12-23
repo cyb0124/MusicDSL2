@@ -1,10 +1,11 @@
 -- The module produces the waveform from the compiled music and instruments
 
-{-# LANGUAGE GADTs, RankNTypes, ScopedTypeVariables #-}
+{-# LANGUAGE GADTs #-}
 
-module Synth() where
+module Synth(synth, toWav) where
 import Control.Monad
 import Control.Monad.ST
+import Data.WAVE
 import Data.Function
 import Data.STRef
 import Data.Array.MArray
@@ -14,14 +15,15 @@ import Stereo
 import Music
 
 -- Constants
-maxReleaseTime = 10 :: Float
-sampFreq = 44100 :: Float
+maxReleaseTime = 8 :: Double
+sampFreq = 44100 :: Double
 
 -- Instrument life
 data InstLife where
-  Triggered :: Float -> InstLife
-  Released :: Float -> InstLife
+  Triggered :: Double -> InstLife
+  Released :: Double -> InstLife
   Died :: InstLife
+  deriving Show
 
 isTriggered (Triggered _) = True
 isTriggered _ = False
@@ -29,10 +31,11 @@ isTriggered _ = False
 isAlive Died = False
 isAlive _ = True
 
-decreaseLife :: InstLife -> Float -> InstLife
+decreaseLife :: InstLife -> Double -> InstLife
 decreaseLife life dt = case life of
   Triggered x -> if x <= dt then Released maxReleaseTime else Triggered $ x - dt
-  Released x -> if x < 1 / sampFreq then Died else Released $ x - 1 / sampFreq
+  Released x -> if x <= 1 / sampFreq then Died else Released $ x - 1 / sampFreq
+  Died -> Died
 
 -- Instrument state
 data InstState s = InstState {
@@ -43,7 +46,7 @@ data InstState s = InstState {
 
 -- Main synthesize function
 synth :: [TimedEvent] -> [Stereo]
-synth es = runST $ do
+synth es = reverse $ runST $ do
   time <- newSTRef 0
   events <- newSTRef es
   insts <- newSTRef []
@@ -107,9 +110,14 @@ synth es = runST $ do
     timeNow <- readSTRef time
     let dt = bpmNow / 60 / sampFreq
     nowOutput <- procInsts timeNow dt
-    modifySTRef output (++[nowOutput])
+    modifySTRef output (nowOutput:)
     writeSTRef time $ timeNow + dt
     continue <- not <$> shouldStop
     when continue loop
 
   readSTRef output
+
+-- Convert sample list to wav format
+toWav :: [Stereo] -> WAVE
+toWav x = WAVE (WAVEHeader 2 (round sampFreq) 32 Nothing) $
+  (\(Stereo l r) -> [doubleToSample l, doubleToSample r]) <$> x

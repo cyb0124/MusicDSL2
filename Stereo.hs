@@ -2,7 +2,7 @@
 
 module Stereo(Stereo(..), dB, mono, pan) where
 
-data Stereo = Stereo {lChn :: Float, rChn :: Float} deriving Show
+data Stereo = Stereo {lChn :: Double, rChn :: Double} deriving Show
 
 instance Num Stereo where
   (Stereo a b) + (Stereo c d) = Stereo (a + c) (b + d)
@@ -16,7 +16,7 @@ instance Num Stereo where
 dB x = 10 ** (x / 20)
 
 -- Convert mono sample to stereo sample by panning
-pan :: Float -> Float -> Stereo
+pan :: Double -> Double -> Stereo
 pan angle x =
   let
     c = cos angle
@@ -25,5 +25,5 @@ pan angle x =
   in
     Stereo (scale * (c + s) * x) (scale * (c - s) * x)
 
--- Panning at center
-mono = pan 0
+-- Convert mono sample to stereo sample by copying
+mono x = Stereo x x

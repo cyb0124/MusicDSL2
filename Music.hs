@@ -26,7 +26,7 @@ type Time = Ratio Int
 type MusicWriterT = WriterT [TimedEvent]
 data TimedEvent = TimedEvent {teTime :: Time, teEvent :: Event}
 data Event = EvBPMChange BPMChange | EvNote Note
-data BPMChange = BPMChange Float deriving Show
+data BPMChange = BPMChange Double deriving Show
 data Note = Note {
     nInst :: InstProc, -- The instrument used for this note
     nPitch :: Int,     -- The pitch of this note (number of semitones from A4)
@@ -40,7 +40,7 @@ data MusicState = MusicState {
     nsTime :: Time,    -- Current time
     nsKey :: Int,      -- Current key
     nsMode :: Mode,    -- Current mode
-    nsBPM :: Float,    -- Current tempo
+    nsBPM :: Double,   -- Current tempo
     nsInst :: InstProc -- Current instrument
   }
 
@@ -66,7 +66,7 @@ inst x = do
   now <- get
   put $ now {nsInst = compileInst x}
 
-bpm :: Float -> Music ()
+bpm :: Double -> Music ()
 bpm x = do
   now <- get
   put $ now {nsBPM = x}
