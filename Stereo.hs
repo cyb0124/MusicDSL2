@@ -1,5 +1,7 @@
 -- Data type for stereo sample
 
+{-# LANGUAGE Strict, StrictData #-}
+
 module Stereo(Stereo(..), dB, mono, pan) where
 
 data Stereo = Stereo {lChn :: Double, rChn :: Double} deriving Show

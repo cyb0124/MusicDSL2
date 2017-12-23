@@ -1,6 +1,6 @@
 -- The module produces the waveform from the compiled music and instruments
 
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE GADTs, Strict, StrictData #-}
 
 module Synth(synth, toWav) where
 import Control.Monad
@@ -104,7 +104,7 @@ synth es = reverse $ runST $ do
         writeSTRef insts newInsts
         return result
 
-  fix $ \loop -> do
+  fix $ \(~loop) -> do
     procEvents
     bpmNow <- readSTRef bpm
     timeNow <- readSTRef time

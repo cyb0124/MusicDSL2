@@ -1,6 +1,6 @@
 -- A library for making synthesizers
 
-{-# LANGUAGE Arrows #-}
+{-# LANGUAGE Arrows, Strict, StrictData #-}
 
 module InstLib(pitch2freq, vco, saw, ADSR(..), adsr) where
 import Prelude hiding ((.))

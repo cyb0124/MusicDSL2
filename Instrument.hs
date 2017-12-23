@@ -1,7 +1,7 @@
 -- This file defines the instrument procedure AST
 -- and implements the compilation of it.
 
-{-# LANGUAGE RankNTypes, GADTs #-}
+{-# LANGUAGE RankNTypes, GADTs, Strict, StrictData #-}
 
 module Instrument(
   InstCtx(..), Inst, InstProc(..),
