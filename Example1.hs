@@ -25,7 +25,6 @@ testMusic = do
   mode Major
   bpm 150
   inst testInst
-  music "2/1 (1 4 6)"
-  -- music "2/1 (1 4 6) (2 5 7) (3 #5 7) (3 6 ^1) (v6 ^1 4) (v7 ^2 5) (v3 5 ^1) (1 3 5 b7)"
+  music "2/1 (1 4 6) (2 5 7) (3 #5 7) (3 6 ^1) (v6 ^1 4) (v7 ^2 5) (v3 5 ^1) (1 3 5 b7)"
 
 main = putWAVEFile "Example1.wav" $ toWav $ synth $ compileMusic testMusic
