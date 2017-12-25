@@ -4,7 +4,7 @@
 {-# LANGUAGE Arrows #-}
 
 module Music(
-  Time, Music, key, mode, bpm, transpose, rest, tone, note, inst,
+  Time, Music, key, mode, bpm, transpose, rest, tone, note, inst, duration,
   Event(..), TimedEvent(..), BPMChange(..), Note(..),
   compileMusic
 ) where
@@ -37,11 +37,12 @@ data Note = Note {
 -- keep tracking of the local state.
 type MusicStateT = StateT MusicState
 data MusicState = MusicState {
-    nsTime :: Time,    -- Current time
-    nsKey :: Int,      -- Current key
-    nsMode :: Mode,    -- Current mode
-    nsBPM :: Double,   -- Current tempo
-    nsInst :: InstProc -- Current instrument
+    nsTime :: Time,     -- Current time
+    nsKey :: Int,       -- Current key
+    nsMode :: Mode,     -- Current mode
+    nsBPM :: Double,    -- Current tempo
+    nsDuration :: Time, -- Current note duration
+    nsInst :: InstProc  -- Current instrument
   }
 
 type Music = MusicWriterT (MusicStateT Identity)
@@ -72,28 +73,31 @@ bpm x = do
   put $ now {nsBPM = x}
   tellTimed $ EvBPMChange $ BPMChange x
 
+duration :: Time -> Music ()
+duration x = do
+  now <- get
+  put $ now {nsDuration = x}
+
 transpose :: ToTranspose a => a -> Music ()
 transpose x = do
   now <- get
   put $ now {nsKey = nsKey now + toTranspose x}
 
-rest :: Time -> Music ()
-rest duration = do
+rest :: Music ()
+rest = do
   now <- get
-  put now {nsTime = nsTime now + duration}
+  put now {nsTime = nsTime now + nsDuration now}
 
 -- same as note but without delay
-tone :: Pitch p => Time -> p -> Music ()
-tone duration p = do
+tone :: Pitch p => p -> Music ()
+tone p = do
   now <- get
   let pitch = getPitch (nsKey now) (nsMode now) p
-  tellTimed $ EvNote $ Note (nsInst now) pitch duration
+  tellTimed $ EvNote $ Note (nsInst now) pitch (nsDuration now)
 
 -- same as tone but with delay
-note :: Pitch p => Time -> p -> Music ()
-note duration p = do
-  tone duration p
-  rest duration
+note :: Pitch p => p -> Music ()
+note p = tone p >> rest
 
 -- produce the final event list
 compileMusic :: Music () -> [TimedEvent]
@@ -105,6 +109,7 @@ compileMusic m =
         nsKey = 0,
         nsMode = Major,
         nsBPM = 128,
+        nsDuration = 1/1,
         nsInst = compileInst $ proc () -> do returnA -< Stereo 0 0
       }
   in sortOn teTime e
