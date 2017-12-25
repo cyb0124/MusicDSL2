@@ -1,4 +1,4 @@
--- The module produces the waveform from the compiled music and instruments
+-- This module produces the final waveform from the compiled music and instruments
 
 {-# LANGUAGE GADTs, Strict, StrictData #-}
 
@@ -120,4 +120,9 @@ synth es = reverse $ runST $ do
 -- Convert sample list to wav format
 toWav :: [Stereo] -> WAVE
 toWav x = WAVE (WAVEHeader 2 (round sampFreq) 32 Nothing) $
-  (\(Stereo l r) -> [doubleToSample l, doubleToSample r]) <$> x
+  (\(Stereo l r) -> [doubleToSampleChecked l, doubleToSampleChecked r]) <$> x
+
+doubleToSampleChecked x =
+  if x >= -1 && x <= 1
+  then doubleToSample x
+  else error $ "sample out-of-range: " ++ show x

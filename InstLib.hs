@@ -3,7 +3,8 @@
 {-# LANGUAGE Arrows, Strict, StrictData #-}
 
 module InstLib(
-  pitch2freq, vco, saw, ADSR(..), adsr, pulse, square, fm, noise, unison
+  pitch2freq, vco, saw, ADSR(..), adsr, pulse, square, fm, noise, unison,
+  Biquad(..), biquad, lp1, lp2, hp1, hp2, stereoFilter
 ) where
 import Prelude hiding ((.))
 import Control.Category
@@ -13,7 +14,9 @@ import Data.Hashable
 import Data.Fixed
 import Instrument
 import Music
+import Stereo
 import Unison
+import IIR
 
 -- 12-TET
 pitch2freq x = 440 * (2 ** (fromIntegral x / 12))
@@ -84,3 +87,10 @@ adsr = feedback (Atk, 0) $ proc ((param, gate), (state, level)) -> do
         Rel -> if nextLevel <= 0 then (0, Rel) else (nextLevel, Rel)
       nextState' = if gate then nextState else Rel
   returnA -< (level, (nextState', nextLevel'))
+
+-- Convert a mono filter to a stereo filter
+stereoFilter :: Inst (a, Double) Double -> Inst (a, Stereo) Stereo
+stereoFilter filter = proc (param, Stereo x1 x2) -> do
+  y1 <- filter -< (param, x1)
+  y2 <- filter -< (param, x2)
+  returnA -< Stereo y1 y2

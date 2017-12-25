@@ -6,7 +6,7 @@
 module Music(
   Time, Music, key, mode, bpm, transpose, rest, tone, note, inst, duration,
   Event(..), TimedEvent(..), BPMChange(..), Note(..),
-  compileMusic, (<:>), getTime, getBPM
+  compileMusic, (<:>), getTime, getBPM, scoped, modal, reGate, getMode
 ) where
 import Control.Monad.Writer.Lazy
 import Control.Monad.State.Lazy
@@ -89,6 +89,9 @@ getTime = nsTime <$> get
 getBPM :: Music Double
 getBPM = nsBPM <$> get
 
+getMode :: Music Mode
+getMode = nsMode <$> get
+
 rest :: Music ()
 rest = do
   now <- get
@@ -120,16 +123,44 @@ compileMusic m =
       }
   in sortOn teTime e
 
--- combine two pieces of music parallelly
+-- combines two pieces of music parallelly
 (<:>) :: Music () -> Music () -> Music ()
-x1 <:> x2 =
-  do
-    s <- get
-    let y1 = execWriterT x1
-        y2 = execWriterT x2
-        (e1, s1) = runIdentity $ runStateT y1 s
-        (e2, s2) = runIdentity $ runStateT y2 s
-        time = nsTime s1 `max` nsTime s2
-    tell e1
-    tell e2
-    put $ s1 {nsTime = time}
+x1 <:> x2 = do
+  s <- get
+  let y1 = execWriterT x1
+      y2 = execWriterT x2
+      (e1, s1) = runIdentity $ runStateT y1 s
+      (e2, s2) = runIdentity $ runStateT y2 s
+      time = nsTime s1 `max` nsTime s2
+  tell e1
+  tell e2
+  put $ s1 {nsTime = time}
+
+-- restores all states except nsTime when the scope is exited
+scoped :: Music a -> Music a
+scoped x = do
+  s <- get
+  y <- x
+  time <- getTime
+  put $ s {nsTime = time}
+  return y
+
+-- temporarily change the mode
+modal :: Mode -> Music a -> Music a
+modal m x = do
+  old <- getMode
+  mode m
+  y <- x
+  mode old
+  return y
+
+-- change the duration of all notes in a piece of music
+reGate :: (Time -> Time) -> Music a -> Music a
+reGate f x =
+  let
+    f' (TimedEvent time (EvNote n)) =
+      TimedEvent time $ EvNote $ n {nDuration = f $ nDuration n}
+  in do
+    (y, notes) <- lift $ runWriterT x
+    tell $ f' <$> notes
+    return y
