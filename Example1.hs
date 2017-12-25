@@ -13,10 +13,9 @@ import SequenceParser
 testInst = proc () -> do
   nowPitch <- pitch -< ()
   nowGate <- gate -< ()
-  wave <- vco saw -< pitch2freq nowPitch
+  wave <- unison (vco saw) 7 -< (25, 1.5, 0.5, 0.5, pitch2freq nowPitch)
   env <- adsr -< (ADSR 0.001 1 0.1 0.1, nowGate)
-  nowTime <- time -< ()
-  returnA -< pan (sin (2 * pi * nowTime) * 30 / 180 * pi) (wave * env)
+  returnA -< wave * mono env
 
 testMusic = do
   key "D4"

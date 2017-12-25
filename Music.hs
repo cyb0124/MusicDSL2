@@ -6,7 +6,7 @@
 module Music(
   Time, Music, key, mode, bpm, transpose, rest, tone, note, inst, duration,
   Event(..), TimedEvent(..), BPMChange(..), Note(..),
-  compileMusic, (<:>), getTime
+  compileMusic, (<:>), getTime, getBPM
 ) where
 import Control.Monad.Writer.Lazy
 import Control.Monad.State.Lazy
@@ -85,6 +85,9 @@ transpose x = do
 
 getTime :: Music Time
 getTime = nsTime <$> get
+
+getBPM :: Music Double
+getBPM = nsBPM <$> get
 
 rest :: Music ()
 rest = do

@@ -3,7 +3,7 @@
 {-# LANGUAGE Arrows, Strict, StrictData #-}
 
 module InstLib(
-  pitch2freq, vco, saw, ADSR(..), adsr, pulse, square, fm, noise
+  pitch2freq, vco, saw, ADSR(..), adsr, pulse, square, fm, noise, unison
 ) where
 import Prelude hiding ((.))
 import Control.Category
@@ -13,6 +13,7 @@ import Data.Hashable
 import Data.Fixed
 import Instrument
 import Music
+import Unison
 
 -- 12-TET
 pitch2freq x = 440 * (2 ** (fromIntegral x / 12))
