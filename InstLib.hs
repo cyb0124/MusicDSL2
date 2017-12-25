@@ -2,23 +2,26 @@
 
 {-# LANGUAGE Arrows, Strict, StrictData #-}
 
-module InstLib(pitch2freq, vco, saw, ADSR(..), adsr, pulse, square) where
+module InstLib(
+  pitch2freq, vco, saw, ADSR(..), adsr, pulse, square, fm, noise
+) where
 import Prelude hiding ((.))
 import Control.Category
 import Control.Arrow
+import System.Random
+import Data.Hashable
 import Data.Fixed
 import Instrument
+import Music
 
 -- 12-TET
 pitch2freq x = 440 * (2 ** (fromIntegral x / 12))
 
 -- Used for oscillators
 phaseIntegrator :: Inst Double Double
-phaseIntegrator = proc freq -> do
-  feedback 0 $ proc (freq, s) -> do
-    sr <- sampFreq -< ()
-    returnA -< (s * 2 * pi, mod' (s + freq / sr) 1)
-  -< freq
+phaseIntegrator = feedback 0 $ proc (freq, s) -> do
+  sr <- sampFreq -< ()
+  returnA -< (s * 2 * pi, mod' (s + freq / sr) 1)
 
 -- Make a simple VCO from a given wave function
 vco :: (Double -> Double) -> Inst Double Double
@@ -42,28 +45,41 @@ saw x =
   let x' = x / (2 * pi)
   in mod' (2 * x' + 1) 2 - 1
 
+-- Construct a FM oscillator from two oscillators
+fm :: Inst Double Double -> Inst Double Double -> Inst (Double, Double, Double) Double
+fm carrier modulator = proc (freq, ratio, index) -> do
+  let mFreq = freq * ratio
+  mWave <- modulator -< mFreq
+  carrier -< freq + mFreq * index * mWave
+
+-- White noise generator, seeded by the current musical time
+noise :: Music (Inst () Double)
+noise = do
+  seed <- hash <$> getTime
+  return $ feedback (mkStdGen seed) $ proc ((), g) -> do
+    let (y, g') = random g
+    returnA -< (y * 2 - 1, g')
+
 -- ADSR envelope parameters
 data ADSR = ADSR {atk :: Double, dcy :: Double, sus :: Double, rel :: Double}
 data ADSRState = Atk | Dcy | Sus | Rel deriving (Eq, Ord)
 
 -- linear ADSR envelope generator
 adsr :: Inst (ADSR, Bool) Double
-adsr = proc x -> do
-  feedback (Atk, 0) $ proc ((param, gate), (state, level)) -> do
-    sr <- sampFreq -< ()
-    let atkRate = 1 / (sr * atk param)
-        dcyRate = (1 - sus param) / (sr * dcy param)
-        relRate = sus param / (sr * rel param)
-        nextLevel = case state of
-          Atk -> level + atkRate
-          Dcy -> level - dcyRate
-          Sus -> level
-          Rel -> level - relRate
-        (nextLevel', nextState) = case state of
-          Atk -> if nextLevel >= 1 then (1, Dcy) else (nextLevel, Atk)
-          Dcy -> if nextLevel <= sus param then (sus param, Sus) else (nextLevel, Dcy)
-          Sus -> (nextLevel, Sus)
-          Rel -> if nextLevel <= 0 then (0, Rel) else (nextLevel, Rel)
-        nextState' = if gate then nextState else Rel
-    returnA -< (level, (nextState', nextLevel'))
-  -< x
+adsr = feedback (Atk, 0) $ proc ((param, gate), (state, level)) -> do
+  sr <- sampFreq -< ()
+  let atkRate = 1 / (sr * atk param)
+      dcyRate = (1 - sus param) / (sr * dcy param)
+      relRate = sus param / (sr * rel param)
+      nextLevel = case state of
+        Atk -> level + atkRate
+        Dcy -> level - dcyRate
+        Sus -> level
+        Rel -> level - relRate
+      (nextLevel', nextState) = case state of
+        Atk -> if nextLevel >= 1 then (1, Dcy) else (nextLevel, Atk)
+        Dcy -> if nextLevel <= sus param then (sus param, Sus) else (nextLevel, Dcy)
+        Sus -> (nextLevel, Sus)
+        Rel -> if nextLevel <= 0 then (0, Rel) else (nextLevel, Rel)
+      nextState' = if gate then nextState else Rel
+  returnA -< (level, (nextState', nextLevel'))

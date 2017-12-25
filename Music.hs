@@ -6,7 +6,7 @@
 module Music(
   Time, Music, key, mode, bpm, transpose, rest, tone, note, inst, duration,
   Event(..), TimedEvent(..), BPMChange(..), Note(..),
-  compileMusic
+  compileMusic, (<:>), getTime
 ) where
 import Control.Monad.Writer.Lazy
 import Control.Monad.State.Lazy
@@ -83,6 +83,9 @@ transpose x = do
   now <- get
   put $ now {nsKey = nsKey now + toTranspose x}
 
+getTime :: Music Time
+getTime = nsTime <$> get
+
 rest :: Music ()
 rest = do
   now <- get
@@ -113,3 +116,17 @@ compileMusic m =
         nsInst = compileInst $ proc () -> do returnA -< Stereo 0 0
       }
   in sortOn teTime e
+
+-- combine two pieces of music parallelly
+(<:>) :: Music () -> Music () -> Music ()
+x1 <:> x2 =
+  do
+    s <- get
+    let y1 = execWriterT x1
+        y2 = execWriterT x2
+        (e1, s1) = runIdentity $ runStateT y1 s
+        (e2, s2) = runIdentity $ runStateT y2 s
+        time = nsTime s1 `max` nsTime s2
+    tell e1
+    tell e2
+    put $ s1 {nsTime = time}
