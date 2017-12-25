@@ -40,6 +40,18 @@ data Inst a b where
   InstLoop    :: s -> Inst (a, s) (b, s) -> Inst a b
   InstLoop'   :: Int -> Inst (a, s) (b, s) -> Inst a b
 
+instance Show (Inst a b) where
+  show x = case x of
+    InstId -> "id"
+    InstThen x y -> "(" ++ show x ++ ") then (" ++ show y ++ ")"
+    InstFun _ -> "<function>"
+    InstFirst x -> "first (" ++ show x ++ ")"
+    InstSecond x -> "second (" ++ show x ++ ")"
+    InstCombine x y -> "(" ++ show x ++ ") * (" ++ show y ++ ")"
+    InstFanout x y -> "(" ++ show x ++ ") & (" ++ show y ++ ")"
+    InstCtx _ -> "<ctx>"
+    InstLoop _ x -> "loop (" ++ show x ++ ")"
+
 instance Category Inst where
   id = InstId
   (.) = flip InstThen
