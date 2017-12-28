@@ -16,7 +16,7 @@ import Stereo
 import Music
 
 -- Constants
-maxReleaseTime = 8 :: Double
+maxReleaseTime = 1 :: Double
 sampFreq = 44100 :: Double
 
 -- Instrument life

@@ -3,7 +3,6 @@ import Data.WAVE
 import Music
 import Synth
 import Stereo
-import Theory
 import InstLib
 import DrumLib
 import Instrument
@@ -19,12 +18,13 @@ drumLoop =
       snares = do
         inst $ snare >>^ (*0.3) >>^ pan (0.2)
         music ". . 1 . . . 1 ."
-  in music "1/2" >> kicks <:> hats <:> snares
+      rides = do
+        inst $ ride >>^ (*0.1) >>^ pan (0.3)
+        music ". . . . . . . 1"
+  in music "1/2" >> kicks <:> hats <:> snares <:> rides
 
 testMusic = do
-  key "Bb4"
-  mode Dorian
   bpm 128
-  drumLoop
+  sequence_ $ replicate 4 drumLoop
 
 main = putWAVEFile "Example1.wav" $ toWav $ synth $ compileMusic testMusic

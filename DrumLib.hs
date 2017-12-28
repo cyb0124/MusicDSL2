@@ -1,4 +1,4 @@
--- Drum kits
+-- Implements synthesized drum kits
 
 {-# LANGUAGE Strict, StrictData #-}
 
