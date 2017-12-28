@@ -5,7 +5,7 @@
 
 module Instrument(
   InstCtx(..), Inst, InstProc(..),
-  feedback, sampFreq, time, gate, pitch, compileInst, Box
+  feedback, time, gate, pitch, compileInst, Box
 ) where
 import Prelude hiding ((.))
 import Control.Category
@@ -21,7 +21,6 @@ import Stereo
 
 -- A context accessible by instrument procedures during each sample
 data InstCtx = MkInstCtx {
-    icFS :: Double,   -- Sampling frequency
     icTime :: Double, -- Current time (number of beats elapsed)
     icGate :: Bool,   -- Whether the key is pressed
     icPitch :: Int    -- Current note (number of semitones from A4)
@@ -69,7 +68,6 @@ instance Arrow Inst where
 feedback = InstLoop
 
 -- Context queries
-sampFreq = InstCtx icFS -- Get the sampling frequency
 time = InstCtx icTime   -- Get the number of beats elapsed
 gate = InstCtx icGate   -- Get whether the key is pressed
 pitch = InstCtx icPitch -- Get the current note (number of semitones from A4)

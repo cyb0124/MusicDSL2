@@ -158,6 +158,7 @@ reGate f x =
   let
     f' (TimedEvent time (EvNote n)) =
       TimedEvent time $ EvNote $ n {nDuration = f $ nDuration n}
+    f' other = other
   in do
     (y, notes) <- lift $ runWriterT x
     tell $ f' <$> notes

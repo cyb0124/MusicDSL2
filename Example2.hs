@@ -14,10 +14,10 @@ import SequenceParser
 drumLoop =
   let kicks = do
         inst $ kick >>^ (*0.5) >>^ mono
-        music "1 . . 1 1 . . ."
+        music "1 . . . 1 1 . ."
       hats = do
         inst $ hihat >>^ (*0.1) >>^ pan (-0.2)
-        music "1 1 1 1 1 1 1 1"
+        music "{1/4 . 1 1 1 1 . 1 1} 1 1 1 1"
       snares = do
         inst $ snare >>^ (*0.3) >>^ pan (0.2)
         music ". . 1 . . . 1 ."
@@ -30,4 +30,4 @@ testMusic = do
   bpm 128
   sequence_ $ replicate 4 drumLoop
 
-main = putWAVEFile "Example1.wav" $ toWav $ synth $ compileMusic testMusic
+main = putWAVEFile "Example2.wav" $ toWav $ synth $ compileMusic testMusic

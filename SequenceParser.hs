@@ -53,8 +53,15 @@ down = M.transpose (False, Interval IPerfect 8) <$ char 'v'
 
 evTranspose = M.transpose <$> transpose
 
+-- Scoped
+evScoped = do
+  char '{'
+  notes <- M.scoped <$> events
+  char '}'
+  return notes
+
 -- Event
-event = try evRatio <|> evNote M.note <|> rest <|> up <|> down <|> chord <|> evTranspose
+event = try evRatio <|> evNote M.note <|> rest <|> up <|> down <|> chord <|> evTranspose <|> evScoped
 events = foldl (>>) (return ()) <$> sepBy1 event spaces
 
 -- Exported function

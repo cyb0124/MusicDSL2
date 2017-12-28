@@ -5,17 +5,20 @@
 module InstLib(
   pitch2freq, vco, saw, ADSR(..), adsr, localTime,
   pulse, square, fm, noise, unison, poly, tri,
-  Biquad(..), biquad, lp1, lp2, hp1, hp2, stereoFilter
+  Biquad(..), biquad, lp1, lp2, hp1, hp2, stereoFilter,
+  delayLine
 ) where
 import Prelude hiding ((.), id)
 import Control.Category
 import Control.Arrow
 import System.Random
+import Data.Sequence as S
 import Data.Fixed
 import Instrument
 import Music
 import Stereo
 import Unison
+import Synth
 import IIR
 
 -- 12-TET
@@ -23,13 +26,13 @@ pitch2freq x = 440 * (2 ** (fromIntegral x / 12))
 
 -- Used for oscillators
 phaseIntegrator :: Inst Double Double
-phaseIntegrator = feedback 0 $ (sampFreq &&& id) >>^ iteration where
-  iteration (sampFreq, (freq, s)) = (s * 2 * pi, mod' (s + freq / sampFreq) 1)
+phaseIntegrator = feedback 0 $ arr iteration where
+  iteration (freq, s) = (s * 2 * pi, mod' (s + freq / sampFreq) 1)
 
 -- Current time inside the instrument
 localTime :: Inst p Double
-localTime = feedback 0 $ (sampFreq &&& id) >>^ iteration where
-  iteration (sampFreq, (_, s)) = (s, s + 1 / sampFreq)
+localTime = feedback 0 $ arr iteration where
+  iteration (_, s) = (s, s + 1 / sampFreq)
 
 -- Make a simple VCO from a given wave function
 vco :: (Double -> Double) -> Inst Double Double
@@ -72,8 +75,8 @@ data ADSRState = Atk | Dcy | Sus | Rel deriving (Eq, Ord)
 
 -- linear ADSR envelope generator
 adsr :: Inst (ADSR, Bool) Double
-adsr = feedback (Atk, 0) $ (sampFreq &&& id) >>^ iteration where
-  iteration (sampFreq, ((param, gate), (state, level))) =
+adsr = feedback (Atk, 0) $ arr iteration where
+  iteration ((param, gate), (state, level)) =
     let
       atkRate = 1 / (sampFreq * atk param)
       dcyRate = (1 - sus param) / (sampFreq * dcy param)
@@ -102,3 +105,12 @@ poly [(x0,y0)] x = y0
 poly ((x0,y0):ps@((x1,y1):_)) x
   | x > x1 = poly ps x
   | otherwise = let a = (x - x0) / (x1 - x0) in y0 * (1 - a) + y1 * a
+
+-- Delay line
+delayLine :: a -> Double -> Inst a a
+delayLine init length =
+  let
+    samples = round $ length * sampFreq
+    initState = S.replicate samples init
+    iteration (x, (s:<|ss)) = (s, ss|>x)
+  in feedback initState $ arr iteration

@@ -2,7 +2,7 @@
 
 {-# LANGUAGE GADTs, Strict, StrictData #-}
 
-module Synth(synth, toWav) where
+module Synth(synth, toWav, sampFreq) where
 import Control.Monad
 import Control.Monad.ST
 import Data.WAVE
@@ -11,7 +11,7 @@ import Data.STRef
 import Data.Array.MArray
 import Data.Array.ST
 import Debug.Trace
-import Instrument hiding (sampFreq)
+import Instrument
 import Stereo
 import Music
 
@@ -89,7 +89,6 @@ synth es = reverse $ runST $ do
       procInst time dt state = do
         nowLife <- readSTRef $ isLife state
         let ctx = MkInstCtx {
-                icFS = sampFreq,
                 icTime = time,
                 icGate = isTriggered nowLife,
                 icPitch = isPitch state

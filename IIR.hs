@@ -8,6 +8,7 @@ import Control.Category
 import Control.Arrow
 import Instrument
 import Stereo
+import Synth
 
 data Biquad = Biquad {
     bqW0 :: Double, -- Center frequency (rad/s)
@@ -20,8 +21,8 @@ data Biquad = Biquad {
   }
 
 biquad :: Inst (Biquad, Double) Double
-biquad = feedback (0, 0) $ (sampFreq &&& id) >>^ iteration where
-  iteration (sampFreq, ((params, x), (w1, w2))) =
+biquad = feedback (0, 0) $ arr iteration where
+  iteration ((params, x), (w1, w2)) =
     let k = bqW0 params / tan (bqW0 params / sampFreq / 2)
         a = bqA params * k * k
         b = bqB params * k

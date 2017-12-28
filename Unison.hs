@@ -49,7 +49,7 @@ unison osc n =
         tunes = (\x -> signum x * (abs x ** density)) <$> rawTunes
         cents = (*detune) <$> tunes
         freqs = (\x -> freq * (2 ** (x / 1200))) <$> cents
-        fades = (\x -> exp $ fade * abs x) <$> tunes
+        fades = (\x -> exp $ negate $ fade * abs x) <$> tunes
         wides = zipWith (*) (cycle [1, -1]) $ (*wide) <$> (/ fromIntegral predN) <$> fromIntegral <$> [0..predN]
         scale = recip $ sum fades
       in UnisonParams freqs wides fades scale
