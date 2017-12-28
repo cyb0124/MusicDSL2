@@ -3,7 +3,8 @@
 {-# LANGUAGE Arrows, Strict, StrictData #-}
 
 module InstLib(
-  pitch2freq, vco, saw, ADSR(..), adsr, pulse, square, fm, noise, unison,
+  pitch2freq, vco, saw, ADSR(..), adsr,
+  pulse, square, fm, noise, unison,
   Biquad(..), biquad, lp1, lp2, hp1, hp2, stereoFilter
 ) where
 import Prelude hiding ((.))
