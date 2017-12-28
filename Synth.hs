@@ -10,6 +10,7 @@ import Data.Function
 import Data.STRef
 import Data.Array.MArray
 import Data.Array.ST
+import Debug.Trace
 import Instrument hiding (sampFreq)
 import Stereo
 import Music
@@ -123,6 +124,6 @@ toWav x = WAVE (WAVEHeader 2 (round sampFreq) 32 Nothing) $
   (\(Stereo l r) -> [doubleToSampleChecked l, doubleToSampleChecked r]) <$> x
 
 doubleToSampleChecked x =
-  if x >= -1 && x <= 1
-  then doubleToSample x
-  else error $ "sample out-of-range: " ++ show x
+  if x > 1 then trace "clip" $ doubleToSample 1
+  else if x < -1 then trace "clip" $ doubleToSample (-1)
+  else doubleToSample x

@@ -1,9 +1,9 @@
 -- Implements unison detuning
 
-{-# LANGUAGE Arrows, Strict, StrictData #-}
+{-# LANGUAGE Strict, StrictData #-}
 
 module Unison (unison) where
-import Prelude hiding ((.))
+import Prelude hiding ((.), id)
 import Control.Category
 import Control.Arrow
 import Instrument
@@ -25,10 +25,14 @@ detuneFreqsDenser n density = f <$> detuneFreqs n where
 
 dupA :: Arrow a => Int -> a b c -> a [b] [c]
 dupA 0 _ = arr $ const []
-dupA n f = let fs = dupA (n - 1) f in proc (x:xs) -> do
-  y <- f -< x
-  ys <- fs -< xs
-  returnA -< (y:ys)
+dupA n f = (\(x:xs) -> (x,xs)) ^>> (f *** dupA (n - 1) f) >>^ uncurry (:)
+
+data UnisonParams = UnisonParams {
+    upFreqs :: [Double],
+    upWides :: [Double],
+    upFades :: [Double],
+    upScale :: Double
+  }
 
 unison :: Inst Double Double -> Int -> Inst (Double, Double, Double, Double, Double) Stereo
 unison osc n =
@@ -36,16 +40,22 @@ unison osc n =
     rawTunes = detuneFreqs n
     oscs = dupA n osc
     predN = pred n
-  in proc (detune, density, fade, wide, freq) -> do
-    -- detune: [0, 25]
-    -- density: [1, 4]
-    -- fade: [0.5, 4]
-    -- wide: [0, pi/4]
-    let tunes = (\x -> signum x * (abs x ** density)) <$> rawTunes
+    mkParams (detune, density, fade, wide, freq) =
+      -- detune: [0, 25]
+      -- density: [1, 4]
+      -- fade: [0.5, 4]
+      -- wide: [0, pi/4]
+      let
+        tunes = (\x -> signum x * (abs x ** density)) <$> rawTunes
         cents = (*detune) <$> tunes
         freqs = (\x -> freq * (2 ** (x / 1200))) <$> cents
         fades = (\x -> exp $ fade * abs x) <$> tunes
         wides = zipWith (*) (cycle [1, -1]) $ (*wide) <$> (/ fromIntegral predN) <$> fromIntegral <$> [0..predN]
-    monos <- oscs -< freqs
-    let waves = zipWith pan wides $ zipWith (*) fades monos
-    returnA -< sum waves * mono (recip $ sum fades)
+        scale = recip $ sum fades
+      in UnisonParams freqs wides fades scale
+    mix (monos, params) =
+      let
+        faded = zipWith (*) (upFades params) monos
+        panned = zipWith pan (upWides params) faded
+      in sum panned * mono (upScale params)
+  in mkParams ^>> ((oscs <<^ upFreqs) &&& id) >>^ mix

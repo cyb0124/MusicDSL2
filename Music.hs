@@ -1,8 +1,6 @@
 -- This file defines the musical notation eDSL
 -- For the instrument specification language, see Instrument.hs
 
-{-# LANGUAGE Arrows #-}
-
 module Music(
   Time, Music, key, mode, bpm, transpose, rest, tone, note, inst, duration,
   Event(..), TimedEvent(..), BPMChange(..), Note(..),
@@ -119,7 +117,7 @@ compileMusic m =
         nsMode = Major,
         nsBPM = 128,
         nsDuration = 1/1,
-        nsInst = compileInst $ proc () -> do returnA -< Stereo 0 0
+        nsInst = compileInst $ arr $ const $ Stereo 0 0
       }
   in sortOn teTime e
 
