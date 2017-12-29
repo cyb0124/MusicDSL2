@@ -6,7 +6,7 @@ module InstLib(
   pitch2freq, vco, saw, ADSR(..), adsr, localTime,
   pulse, square, fm, noise, unison, poly, tri, analogSaw,
   Biquad(..), biquad, lp1, lp2, hp1, hp2, stereoFilter,
-  delayLine, fbDelay
+  delayLine, fbDelay, syncInst
 ) where
 import Prelude hiding ((.), id)
 import Control.Category
@@ -129,3 +129,9 @@ flattenA (x:xs) = (x &&& flattenA xs) >>^ uncurry (:)
 fbDelay :: Num a => [Inst a a] -> Inst a a
 fbDelay delayLines = feedback 0 $ uncurry (+) ^>> (id &&& delay) where
   delay = flattenA delayLines >>^ sum
+
+-- Provides instrument procedure the relative musical time
+syncInst :: Music (Inst p Double)
+syncInst = do
+  t <- realToFrac <$> getTime
+  return $ time >>^ (subtract t)
