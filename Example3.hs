@@ -96,6 +96,7 @@ mBassIntro = scoped $ reGate (\x -> x - (1/16)) $ do
 iHat = hihat >>^ pan 0.2 . (* dB (-20))
 iRide = ride >>^ pan 0.3 . (* dB (-20))
 iKick = kick >>^ mono . (* dB (-13))
+iTom x = kick' x >>^ mono . (* dB (-13))
 iSnare = snare >>^ mono . (* dB (-17))
 iSnare2 = iSnare >>> (\x -> (4000, x)) ^>> stereoFilter lp1
 
@@ -126,13 +127,30 @@ mDrumB = scoped $ do
 -- Drum loop combined
 mDrum = sequence_ [mDrumA, mDrumA, mDrumA, mDrumAB, mDrumB, mDrumB]
 
+-- Drum intro
+mDrumIntroRaw = scoped $ do
+  music "1/2"
+  let kicks = inst iKick >> music "1 1 1 1 1 1 1 1"
+      toms = scoped $ music ". . . . 1/4"
+        >> mapM_ (\x -> inst (iTom x) >> music "1") [3, 2.5, 2, 1.5]
+      snares = scoped $ inst iSnare >> music ". . . . . . 1/4 1 1 1 1"
+      hats = scoped $ inst iHat >> music ". . . . 1/4 1 1 1 1 1 1 1 1"
+  kicks <:> toms <:> snares <:> hats
+
+mDrumIntro = do
+  music "12/1 ."
+  t <- syncInst
+  let env = mono . poly [(0, 0.5), (1, 0.7), (2, 0.7), (4, 1)]
+  reInst (\i -> t >>> ((const () ^>> i) &&& arr env) >>^ uncurry (*)) mDrumIntroRaw
+
 -- Main music arrangement
 theMusic = do
   bpm 128
   key "Bb3"
   mode Minor
   mLead
-  mLead <:> mPadIntro <:> mBassIntro
+  mLead <:> mPadIntro <:> mBassIntro <:> mDrumIntro
+  mLead <:> mPad <:> mBass <:> mDrum
   mLead <:> mPad <:> mBass <:> mDrum
 
 main = putWAVEFile "Example3.wav" $ toWav $ synth $ compileMusic theMusic

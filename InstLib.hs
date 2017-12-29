@@ -39,7 +39,7 @@ localTime = feedback 0 $ arr iteration where
 vco :: (Double -> Double) -> Inst Double Double
 vco waveFn = waveFn ^<< phaseIntegrator
 
--- Pulse wave with variable duty-cycle
+-- Pulse wave with variable duty-cycle (may have DC component; needs coupling)
 pulse :: Inst (Double, Double) Double
 pulse = second phaseIntegrator >>^ comparator where
   comparator (duty, x) = if x / (2 * pi) < duty then 1 else -1
@@ -104,7 +104,7 @@ stereoFilter :: Inst (a, Double) Double -> Inst (a, Stereo) Stereo
 stereoFilter filter = split ^>> (filter *** filter) >>^ uncurry Stereo where
   split (a, Stereo l r) = ((a, l), (a, r))
 
--- Polyline
+-- Polyline linear interpolation. Can be used for wave-shapes and envelopes.
 poly :: (Ord a, Fractional a) => [(a, a)] -> a -> a
 poly [(x0,y0)] x = y0
 poly ((x0,y0):ps@((x1,y1):_)) x

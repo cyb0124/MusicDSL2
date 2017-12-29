@@ -2,7 +2,7 @@
 
 {-# LANGUAGE Strict, StrictData #-}
 
-module DrumLib(kick, hihat, ride, snare) where
+module DrumLib(kick', kick, hihat, ride, snare) where
 import Prelude hiding ((.), id)
 import Control.Category
 import Control.Arrow
@@ -12,15 +12,17 @@ import Stereo
 import Music
 
 -- Kick drum
-kick :: Inst p Double
-kick =
+kick' :: Double -> Inst p Double
+kick' pitch =
   let
-    freq = poly [(0, 1200), (0.01, 180), (0.05, 80), (0.15, 40)]
+    freq = (*pitch) <$> poly [(0, 1200), (0.01, 180), (0.05, 80), (0.15, 40)]
     sAmp = dB . poly [(0, 0), (1, -40), (1.1, -1/0)]
     nAmp = dB . poly [(0, -30), (0.06, -60), (0.07, -1/0)]
     distort x = tanh (x * 0.7) / 0.7
     mix (sWave, (nWave, t)) = distort sWave * sAmp t + nWave * nAmp t
   in localTime >>> ((freq ^>> vco sin) &&& noise &&& id) >>^ mix
+
+kick = kick' 1
 
 -- Hi-hat
 hihat :: Inst p Double
