@@ -26,7 +26,8 @@ accidental = sharp <|> flat
 accidentals = sum <$> many accidental
 
 -- Absolute notes
-noteLetter = (subtract $ fromEnum 'A') <$> fromEnum <$> satisfy (\x -> x >= 'A' && x <= 'G')
+noteLetter = ([0, 2, 3, 5, 7, 8, 10] !!) <$> (subtract $ fromEnum 'A')
+  <$> fromEnum <$> satisfy (\x -> x >= 'A' && x <= 'G')
 octaveNum = (subtract 4) <$> digitNum
 absoluteNote = sum <$> sequence [noteLetter, accidentals, (*12) <$> octaveNum]
 

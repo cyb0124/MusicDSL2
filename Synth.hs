@@ -3,6 +3,7 @@
 {-# LANGUAGE GADTs, Strict, StrictData #-}
 
 module Synth(synth, toWav, sampFreq) where
+import System.Random
 import Control.Monad
 import Control.Monad.ST
 import Data.WAVE
@@ -53,13 +54,21 @@ synth es = reverse $ runST $ do
   insts <- newSTRef []
   bpm <- newSTRef 128
   output <- newSTRef []
+  rng <- newSTRef $ mkStdGen 1234
 
-  let procEvent e = case e of
+  let useRng = do
+        r <- readSTRef rng
+        let (y, r') = random r
+        writeSTRef rng r'
+        return y
+
+      procEvent e = case e of
         EvBPMChange (BPMChange x) -> writeSTRef bpm x
         EvNote note -> do
           let ip = nInst note
               init = ipInit ip
-          state <- newListArray (0, length init - 1) init
+          init' <- forM init $ \f -> f <$> useRng
+          state <- newListArray (0, length init - 1) init'
           life <- newSTRef $ Triggered $ realToFrac $ nDuration note
           let is = InstState {
               isProc = ipProc ip state,

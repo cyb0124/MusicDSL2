@@ -6,13 +6,14 @@ module InstLib(
   pitch2freq, vco, saw, ADSR(..), adsr, localTime,
   pulse, square, fm, noise, unison, poly, tri, analogSaw,
   Biquad(..), biquad, lp1, lp2, hp1, hp2, stereoFilter,
-  delayLine, fbDelay, reverbDelays
+  delayLine, fbDelay
 ) where
 import Prelude hiding ((.), id)
 import Control.Category
 import Control.Arrow
 import System.Random
 import Data.Sequence as S
+import Data.Hashable
 import Data.Fixed
 import Instrument
 import Music
@@ -24,9 +25,9 @@ import IIR
 -- 12-TET
 pitch2freq x = 440 * (2 ** (fromIntegral x / 12))
 
--- Used for oscillators
+-- Used for oscillators. Initial phase is randomized.
 phaseIntegrator :: Inst Double Double
-phaseIntegrator = feedback 0 $ arr iteration where
+phaseIntegrator = feedbackR (* (2 * pi)) $ arr iteration where
   iteration (freq, s) = (s * 2 * pi, mod' (s + freq / sampFreq) 1)
 
 -- Current time inside the instrument
@@ -70,7 +71,7 @@ fm carrier modulator =
 
 -- White noise generator
 noise :: Inst p Double
-noise = feedback (mkStdGen 1234) $ arr iteration where
+noise = feedbackR (mkStdGen . hash) $ arr iteration where
   iteration (_, g) = let (y, g') = random g in (y * 2 - 1, g')
 
 -- ADSR envelope parameters
@@ -128,11 +129,3 @@ flattenA (x:xs) = (x &&& flattenA xs) >>^ uncurry (:)
 fbDelay :: Num a => [Inst a a] -> Inst a a
 fbDelay delayLines = feedback 0 $ uncurry (+) ^>> (id &&& delay) where
   delay = flattenA delayLines >>^ sum
-
--- Delay lines for reverberation
-reverbDelays = [
-    delayLine 0 0.004 >>> (*mono 0.32) ^>> (\x -> (2000, x)) ^>> stereoFilter lp1,
-    delayLine 0 0.013 >>^ (*mono 0.25),
-    delayLine 0 0.027 >>^ (*mono 0.22),
-    delayLine 0 0.051 >>^ (*mono 0.11)
-  ]

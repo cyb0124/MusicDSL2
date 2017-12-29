@@ -5,7 +5,7 @@
 
 module Instrument(
   InstCtx(..), Inst, InstProc(..),
-  feedback, time, gate, pitch, compileInst, Box
+  feedback, feedbackR, time, gate, pitch, compileInst, Box
 ) where
 import Prelude hiding ((.))
 import Control.Category
@@ -36,7 +36,7 @@ data Inst a b where
   InstCombine :: Inst a b -> Inst c d -> Inst (a, c) (b, d)
   InstFanout  :: Inst a b -> Inst a c -> Inst a (b, c)
   InstCtx     :: (InstCtx -> a) -> Inst p a
-  InstLoop    :: s -> Inst (a, s) (b, s) -> Inst a b
+  InstLoop    :: (Double -> s) -> Inst (a, s) (b, s) -> Inst a b
   InstLoop'   :: Int -> Inst (a, s) (b, s) -> Inst a b
 
 -- Class instances
@@ -65,7 +65,10 @@ instance Arrow Inst where
   (&&&) = InstFanout
 
 -- Create a feedback loop; takes an initial state and an state update computation
-feedback = InstLoop
+feedback s = InstLoop (const s)
+
+-- Create a feedback loop with a function to randomize the initial state
+feedbackR = InstLoop
 
 -- Context queries
 time = InstCtx icTime   -- Get the number of beats elapsed
@@ -78,14 +81,14 @@ data Box where
 
 -- Compiled instrument procedure
 data InstProc = InstProc {
-    ipInit :: [Box],
+    ipInit :: [Double -> Box],
     ipProc :: forall s. STArray s Int Box -> InstCtx -> ST s Stereo
   }
 
 -- Assign state indices and collect initial states
-gatherStates :: Inst a b -> (Inst a b, [Box])
+gatherStates :: Inst a b -> (Inst a b, [Double -> Box])
 gatherStates p = B.second reverse $ runState (f p) [] where
-  f :: Inst a b -> State [Box] (Inst a b)
+  f :: Inst a b -> State [Double -> Box] (Inst a b)
   f p = case p of
     InstId -> return p
     InstThen x y -> InstThen <$> f x <*> f y
@@ -98,7 +101,7 @@ gatherStates p = B.second reverse $ runState (f p) [] where
     InstLoop s p -> do
       p' <- f p
       i <- length <$> get
-      modify (Box s:)
+      modify ((Box . s):)
       return $ InstLoop' i p'
 
 -- Compile instrument procedure
