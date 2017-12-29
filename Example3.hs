@@ -20,7 +20,7 @@ iLead = proc () -> do
   envA <- adsr <<< (arr (const (ADSR 0.01 0.5 0.2 0.05)) &&& gate) -< ()
   envF <- adsr <<< (arr (const (ADSR 0.08 0.2 0.0 0.01)) &&& gate) -< ()
   filtered <- tanh ^<< lp2 -< ((envF * 1600 + 800, 1.8), wave)
-  coupled <- hp1 -< (20, filtered)
+  coupled <- hp1 -< (20, filtered) -- AC coupling
   returnA -< pan 0.2 $ envA * coupled * dB (-13)
 
 -- Lead melody
@@ -108,6 +108,12 @@ mDrumA = scoped $ do
       snares = inst iSnare >> music ". . 1 {1/4 . 1 . 1 . .} 1 ."
   hats <:> kicks <:> snares <:> rides
 
+-- Drum loop A to B
+mDrumAB = scoped $ do
+  duration (-2/4); rest; music "1/4";
+  inst $ iSnare >>^ (* mono (dB (-6)))
+  music "1 1"
+
 -- Drum loop B
 mDrumB = scoped $ do
   music "1/4"
@@ -118,7 +124,7 @@ mDrumB = scoped $ do
   kicks <:> snares <:> hats <:> rides
 
 -- Drum loop combined
-mDrum = sequence_ [mDrumA, mDrumA, mDrumA, mDrumB, mDrumB]
+mDrum = sequence_ [mDrumA, mDrumA, mDrumA, mDrumAB, mDrumB, mDrumB]
 
 -- Main music arrangement
 theMusic = do
