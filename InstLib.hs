@@ -4,9 +4,9 @@
 
 module InstLib(
   pitch2freq, vco, saw, ADSR(..), adsr, localTime,
-  pulse, square, fm, noise, unison, poly, tri,
+  pulse, square, fm, noise, unison, poly, tri, analogSaw,
   Biquad(..), biquad, lp1, lp2, hp1, hp2, stereoFilter,
-  delayLine
+  delayLine, fbDelay, reverbDelays
 ) where
 import Prelude hiding ((.), id)
 import Control.Category
@@ -51,6 +51,10 @@ square = (\freq -> (0.5, freq)) ^>> pulse
 saw :: Double -> Double
 saw x = mod' (x / pi + 1) 2 - 1
 
+-- Analog (RC curve) sawtooth
+analogSaw :: Double -> Double
+analogSaw x = 0.15885773 - exp (-x)
+
 -- Triangle wave
 tri :: Double -> Double
 tri = poly [(0, 0), (pi / 2, 1), (3 * pi / 2, -1), (2 * pi, 0)]
@@ -73,14 +77,14 @@ noise = feedback (mkStdGen 1234) $ arr iteration where
 data ADSR = ADSR {atk :: Double, dcy :: Double, sus :: Double, rel :: Double}
 data ADSRState = Atk | Dcy | Sus | Rel deriving (Eq, Ord)
 
--- linear ADSR envelope generator
+-- analog ADSR envelope generator
 adsr :: Inst (ADSR, Bool) Double
 adsr = feedback (Atk, 0) $ arr iteration where
   iteration ((param, gate), (state, level)) =
     let
-      atkRate = 1 / (sampFreq * atk param)
-      dcyRate = (1 - sus param) / (sampFreq * dcy param)
-      relRate = sus param / (sampFreq * rel param)
+      ~atkRate = (1.5 - level) / (sampFreq * atk param)
+      ~dcyRate = (level - sus param / 1.5) / (sampFreq * dcy param)
+      ~relRate = level * 1.5 / (sampFreq * rel param)
       nextLevel = case state of
         Atk -> level + atkRate
         Dcy -> level - dcyRate
@@ -100,7 +104,7 @@ stereoFilter filter = split ^>> (filter *** filter) >>^ uncurry Stereo where
   split (a, Stereo l r) = ((a, l), (a, r))
 
 -- Polyline
-poly :: [(Double, Double)] -> Double -> Double
+poly :: (Ord a, Fractional a) => [(a, a)] -> a -> a
 poly [(x0,y0)] x = y0
 poly ((x0,y0):ps@((x1,y1):_)) x
   | x > x1 = poly ps x
@@ -114,3 +118,21 @@ delayLine init length =
     initState = S.replicate samples init
     iteration (x, (s:<|ss)) = (s, ss|>x)
   in feedback initState $ arr iteration
+
+-- "fanout" a list of arrows
+flattenA :: Arrow a => [a b c] -> a b [c]
+flattenA [] = arr $ const []
+flattenA (x:xs) = (x &&& flattenA xs) >>^ uncurry (:)
+
+-- N-tap delay with feedback
+fbDelay :: Num a => [Inst a a] -> Inst a a
+fbDelay delayLines = feedback 0 $ uncurry (+) ^>> (id &&& delay) where
+  delay = flattenA delayLines >>^ sum
+
+-- Delay lines for reverberation
+reverbDelays = [
+    delayLine 0 0.004 >>> (*mono 0.32) ^>> (\x -> (2000, x)) ^>> stereoFilter lp1,
+    delayLine 0 0.013 >>^ (*mono 0.25),
+    delayLine 0 0.027 >>^ (*mono 0.22),
+    delayLine 0 0.051 >>^ (*mono 0.11)
+  ]
