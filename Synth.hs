@@ -65,7 +65,7 @@ synth es = reverse $ runST $ do
       procEvent e = case e of
         EvBPMChange (BPMChange x) -> writeSTRef bpm x
         EvNote note -> do
-          let ip = nInst note
+          let ip = compileInst $ nInst note
               init = ipInit ip
           init' <- forM init $ \f -> f <$> useRng
           state <- newListArray (0, length init - 1) init'

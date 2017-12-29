@@ -34,23 +34,39 @@ mLead = do
       "7 7 {2/4 7}"
     ]
 
+-- Make a fade-in effect using LP2
+fadeInLP2 :: (Double -> Double) -> Double -> Music a -> Music a
+fadeInLP2 env q m = do
+  t <- realToFrac <$> getTime
+  reInst (\i -> (time >>^ (\freq -> (freq, q)) . env . subtract t) &&& i >>> stereoFilter lp2) m
+
 -- Pad instrument
-iPad = proc () -> do
-  wave <- unison (vco analogSaw) 7 <<< (\x -> (25, 1.5, 0.5, 0.5, pitch2freq x)) ^<< pitch -< ()
-  envA <- adsr <<< (arr (const (ADSR 0.02 1.0 0.5 0.05)) &&& gate) -< ()
-  returnA -< wave * mono (dB (-7) * envA)
+iPad = do
+  delayTime <- (\x -> 60 / x / 2) <$> getBPM
+  return $ proc () -> do
+    wave <- unison (vco analogSaw) 7 <<< (\x -> (25, 1.5, 0.5, 0.5, pitch2freq x)) ^<< pitch -< ()
+    envA <- adsr <<< (arr (const (ADSR 0.02 1.0 0.5 0.05)) &&& gate) -< ()
+    let amped = wave * mono (dB (-7) * envA)
+    fbDelay [delayLine (mono 0) delayTime >>^ (* mono 0.4)] -< amped
 
 -- Pad melody
-mPad = do
-  inst iPad; duration (4/1)
+mPadCommon x = do
+  inst =<< iPad; duration (4/1)
   let chord = music "(1 ^1 #3 5 ^1)"
-  mapM_ (\x -> scoped (music x >> chord)) $ ["+P1", "+m3", "+P4", "+m6 2/1", "+m7 2/1"]
+  mapM_ (\x -> scoped (music x >> chord)) x
 
-testMusic = do
+mPadIntro = fadeInLP2 (poly [(0, 100), (4, 8000), (8, 12000), (12, 20000)]) 1
+  $ mPadCommon ["+P1", "+m3", "+P4",
+      "1/4 +m6", "1/4 . . +m6", "1/4 . . +m6",
+      "1/4 . +m7", "1/4 . . +m7", "1/4 . . +m7"]
+mPadLoop = mPadCommon ["+P1", "+m3", "+P4", "2/1 +m6", "2/1 +m7"]
+
+-- Main music arrangement
+theMusic = do
   bpm 128
   key "Bb3"
   mode Minor
   mLead
-  mLead <:> mPad
+  mLead <:> mPadIntro
 
-main = putWAVEFile "Example3.wav" $ toWav $ synth $ compileMusic testMusic
+main = putWAVEFile "Example3.wav" $ toWav $ synth $ compileMusic theMusic

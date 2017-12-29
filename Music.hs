@@ -4,7 +4,7 @@
 module Music(
   Time, Music, key, mode, bpm, transpose, rest, tone, note, inst, duration,
   Event(..), TimedEvent(..), BPMChange(..), Note(..),
-  compileMusic, (<:>), getTime, getBPM, scoped, modal, reGate, getMode
+  compileMusic, (<:>), getTime, getBPM, scoped, modal, reGate, getMode, reInst
 ) where
 import Control.Monad.Writer.Lazy
 import Control.Monad.State.Lazy
@@ -26,21 +26,21 @@ data TimedEvent = TimedEvent {teTime :: Time, teEvent :: Event}
 data Event = EvBPMChange BPMChange | EvNote Note
 data BPMChange = BPMChange Double deriving Show
 data Note = Note {
-    nInst :: InstProc, -- The instrument used for this note
-    nPitch :: Int,     -- The pitch of this note (number of semitones from A4)
-    nDuration :: Time  -- The duration of this note
+    nInst :: Inst () Stereo, -- The instrument used for this note
+    nPitch :: Int,           -- The pitch of this note (number of semitones from A4)
+    nDuration :: Time        -- The duration of this note
   }
 
 -- The music monad contains a writer for recording the notes and a state for
 -- keep tracking of the local state.
 type MusicStateT = StateT MusicState
 data MusicState = MusicState {
-    nsTime :: Time,     -- Current time
-    nsKey :: Int,       -- Current key
-    nsMode :: Mode,     -- Current mode
-    nsBPM :: Double,    -- Current tempo
-    nsDuration :: Time, -- Current note duration
-    nsInst :: InstProc  -- Current instrument
+    nsTime :: Time,          -- Current time
+    nsKey :: Int,            -- Current key
+    nsMode :: Mode,          -- Current mode
+    nsBPM :: Double,         -- Current tempo
+    nsDuration :: Time,      -- Current note duration
+    nsInst :: Inst () Stereo -- Current instrument
   }
 
 type Music = MusicWriterT (MusicStateT Identity)
@@ -63,7 +63,7 @@ mode x = do
 inst :: Inst () Stereo -> Music ()
 inst x = do
   now <- get
-  put $ now {nsInst = compileInst x}
+  put $ now {nsInst = x}
 
 bpm :: Double -> Music ()
 bpm x = do
@@ -117,7 +117,7 @@ compileMusic m =
         nsMode = Major,
         nsBPM = 128,
         nsDuration = 1/1,
-        nsInst = compileInst $ arr $ const $ Stereo 0 0
+        nsInst = arr $ const $ Stereo 0 0
       }
   in sortOn teTime e
 
@@ -152,14 +152,21 @@ modal m x = do
   mode old
   return y
 
--- change the duration of all notes in a piece of music
-reGate :: (Time -> Time) -> Music a -> Music a
-reGate f x =
+-- change some properties of all notes in a piece of music
+reProp :: (Note -> Note) -> Music a -> Music a
+reProp f x =
   let
-    f' (TimedEvent time (EvNote n)) =
-      TimedEvent time $ EvNote $ n {nDuration = f $ nDuration n}
+    f' (TimedEvent time (EvNote n)) = TimedEvent time $ EvNote $ f n
     f' other = other
   in do
     (y, notes) <- lift $ runWriterT x
     tell $ f' <$> notes
     return y
+
+-- change the duration of all notes in a piece of music
+reGate :: (Time -> Time) -> Music a -> Music a
+reGate f = reProp (\n -> n {nDuration = f $ nDuration n})
+
+-- change the instrument of all notes in a piece of music
+reInst :: (Inst () Stereo -> Inst () Stereo) -> Music a -> Music a
+reInst f = reProp (\n -> n {nInst = f $ nInst n})
