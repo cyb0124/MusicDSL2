@@ -19,9 +19,9 @@ iLead = proc () -> do
   wave <- pulse <<< (\x -> (0.3, pitch2freq x)) ^<< pitch -< ()
   envA <- adsr <<< (arr (const (ADSR 0.01 0.5 0.2 0.05)) &&& gate) -< ()
   envF <- adsr <<< (arr (const (ADSR 0.08 0.2 0.0 0.01)) &&& gate) -< ()
-  filtered <- tanh ^<< lp2 -< ((envF * 1600 + 800, 1.8), wave)
+  filtered <- (\x -> tanh (x / 2) * 2) ^<< lp2 -< ((envF * 1600 + 800, 1.8), wave)
   coupled <- hp1 -< (20, filtered) -- AC coupling
-  stereoReverb 0.84 0.2 -< pan 0.2 $ envA * coupled * dB (-32)
+  stereoReverb 0.84 0.2 0.5 -< pan 0.2 $ envA * coupled * dB (-52)
 
 -- Lead melody
 mLead = do
@@ -51,7 +51,7 @@ iPad = do
   return $ proc () -> do
     wave <- unison (vco analogSaw) 7 <<< (\x -> (25, 1.5, 0.5, 0.5, pitch2freq x)) ^<< pitch -< ()
     envA <- adsr <<< (arr (const (ADSR 0.02 1.0 0.5 0.05)) &&& gate) -< ()
-    let amped = wave * mono (dB (-7) * envA)
+    let amped = wave * mono (dB (-5.5) * envA)
     fbDelay $ delayLine (mono 0) delayTime >>^ (* mono 0.4) -< amped
 
 -- Pad melody
@@ -63,7 +63,7 @@ mPad = do
     "1/4 +m6", "1/4 . . +m6", "1/4 . . +m6",
     "1/4 . +m7", "1/4 . . +m7", "1/4 . . +m7"]
 
-mPadIntro = fadeInLP2 (poly [(0, 100), (4, 4000), (8, 8000)])
+mPadIntro = fadeInLP2 (poly [(0, 100), (4, 4000), (8, 4000), (12, 8000)])
   (poly [(0, 0), (12 - 0.01, 0), (12, 1)]) 1 mPad
 
 -- Bass instrument
@@ -73,7 +73,7 @@ iBass' = proc freq -> do
     ^<< first (vco tri &&& vco saw) -< (freq, envC)
   envA <- adsr <<< (arr (const (ADSR 0.02 0.1 0.8 0.05)) &&& gate) -< ()
   filtered <- lp1 -< (400, wave)
-  stereoReverb 0.61 0.2 -< mono $ filtered * envA * dB (-26)
+  stereoReverb 0.61 0.2 0.5 -< mono $ filtered * envA * dB (-45)
 
 iBass = pitch >>> pitch2freq ^>> iBass'
 

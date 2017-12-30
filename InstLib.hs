@@ -11,6 +11,7 @@ module InstLib(
 import Prelude hiding ((.), id)
 import Control.Category
 import Control.Arrow
+import Control.Monad
 import System.Random
 import Data.Sequence as S
 import Data.Hashable
@@ -127,7 +128,7 @@ flattenA (x:xs) = (x &&& flattenA xs) >>^ uncurry (:)
 
 -- feedback comb filter
 fbDelay :: Num a => Inst a a -> Inst a a
-fbDelay delayLine = feedback 0 $ uncurry (+) ^>> (id &&& (delayLine >>^ negate))
+fbDelay delayLine = feedback 0 $ uncurry (+) ^>> (id &&& delayLine)
 
 -- Provides instrument procedure the relative musical time
 syncInst :: Music (Inst p Double)
@@ -138,13 +139,21 @@ syncInst = do
 -- Reverberation (freeverb algorithm)
 revLPF damp = feedback 0 $ arr iteration where
   iteration (x, s) = (s, (1 - damp) * x + damp * s)
-revFbLPF fbAmt damp time = fbDelay $ delayLine 0 time >>> revLPF damp >>^ (*fbAmt)
-reverb fbAmt damp spread =
-  let
-    filters = revFbLPF fbAmt damp <$> (/sampFreq) <$> (+spread) <$>
-      [1557, 1617, 1491, 1422, 1277, 1356, 1188, 1116]
-  in flattenA filters >>^ sum
 
-stereoReverb fbAmt damp =
-  split ^>> reverb fbAmt damp 0 *** reverb fbAmt damp 23 >>^ uncurry Stereo where
+revFbLPF fbAmt damp time = fbDelay $ delayLine 0 time >>> revLPF damp >>^ (*fbAmt)
+
+revAP apAmt time = arr negate &&& loop >>^ uncurry (+) where
+  loop = feedback 0 $ mix ^>> delayLine 0 time >>^ join (,)
+  mix (x, s) = x + s * apAmt
+
+reverb fbAmt damp apAmt spread =
+  let
+    filters = revFbLPF fbAmt damp <$> (/44100) <$> (+spread) <$>
+      [1557, 1617, 1491, 1422, 1277, 1356, 1188, 1116]
+    aps = revAP apAmt <$> (/44100) <$> (+spread) <$>
+      [225, 556, 441, 341]
+  in flattenA filters >>> sum ^>> foldr1 (>>>) aps
+
+stereoReverb fbAmt damp apAmt =
+  split ^>> reverb fbAmt damp apAmt 0 *** reverb fbAmt damp apAmt 23 >>^ uncurry Stereo where
     split (Stereo l r) = (l, r)
