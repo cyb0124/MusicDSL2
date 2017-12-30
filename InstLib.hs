@@ -6,7 +6,7 @@ module InstLib(
   pitch2freq, vco, saw, ADSR(..), adsr, localTime,
   pulse, square, fm, noise, unison, poly, tri, analogSaw,
   Biquad(..), biquad, lp1, lp2, hp1, hp2, stereoFilter,
-  delayLine, fbDelay, syncInst
+  delayLine, fbDelay, syncInst, reverb, stereoReverb
 ) where
 import Prelude hiding ((.), id)
 import Control.Category
@@ -125,13 +125,26 @@ flattenA :: Arrow a => [a b c] -> a b [c]
 flattenA [] = arr $ const []
 flattenA (x:xs) = (x &&& flattenA xs) >>^ uncurry (:)
 
--- N-tap delay with feedback
-fbDelay :: Num a => [Inst a a] -> Inst a a
-fbDelay delayLines = feedback 0 $ uncurry (+) ^>> (id &&& delay) where
-  delay = flattenA delayLines >>^ sum
+-- feedback comb filter
+fbDelay :: Num a => Inst a a -> Inst a a
+fbDelay delayLine = feedback 0 $ uncurry (+) ^>> (id &&& (delayLine >>^ negate))
 
 -- Provides instrument procedure the relative musical time
 syncInst :: Music (Inst p Double)
 syncInst = do
   t <- realToFrac <$> getTime
   return $ time >>^ (subtract t)
+
+-- Reverberation (freeverb algorithm)
+revLPF damp = feedback 0 $ arr iteration where
+  iteration (x, s) = (s, (1 - damp) * x + damp * s)
+revFbLPF fbAmt damp time = fbDelay $ delayLine 0 time >>> revLPF damp >>^ (*fbAmt)
+reverb fbAmt damp spread =
+  let
+    filters = revFbLPF fbAmt damp <$> (/sampFreq) <$> (+spread) <$>
+      [1557, 1617, 1491, 1422, 1277, 1356, 1188, 1116]
+  in flattenA filters >>^ sum
+
+stereoReverb fbAmt damp =
+  split ^>> reverb fbAmt damp 0 *** reverb fbAmt damp 23 >>^ uncurry Stereo where
+    split (Stereo l r) = (l, r)

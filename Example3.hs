@@ -21,7 +21,7 @@ iLead = proc () -> do
   envF <- adsr <<< (arr (const (ADSR 0.08 0.2 0.0 0.01)) &&& gate) -< ()
   filtered <- tanh ^<< lp2 -< ((envF * 1600 + 800, 1.8), wave)
   coupled <- hp1 -< (20, filtered) -- AC coupling
-  returnA -< pan 0.2 $ envA * coupled * dB (-13)
+  stereoReverb 0.84 0.2 -< pan 0.2 $ envA * coupled * dB (-32)
 
 -- Lead melody
 mLead = do
@@ -52,7 +52,7 @@ iPad = do
     wave <- unison (vco analogSaw) 7 <<< (\x -> (25, 1.5, 0.5, 0.5, pitch2freq x)) ^<< pitch -< ()
     envA <- adsr <<< (arr (const (ADSR 0.02 1.0 0.5 0.05)) &&& gate) -< ()
     let amped = wave * mono (dB (-7) * envA)
-    fbDelay [delayLine (mono 0) delayTime >>^ (* mono 0.4)] -< amped
+    fbDelay $ delayLine (mono 0) delayTime >>^ (* mono 0.4) -< amped
 
 -- Pad melody
 mPad = do
@@ -63,7 +63,7 @@ mPad = do
     "1/4 +m6", "1/4 . . +m6", "1/4 . . +m6",
     "1/4 . +m7", "1/4 . . +m7", "1/4 . . +m7"]
 
-mPadIntro = fadeInLP2 (poly [(0, 100), (4, 8000)])
+mPadIntro = fadeInLP2 (poly [(0, 100), (4, 4000), (8, 8000)])
   (poly [(0, 0), (12 - 0.01, 0), (12, 1)]) 1 mPad
 
 -- Bass instrument
@@ -72,15 +72,15 @@ iBass' = proc freq -> do
   wave <- (\((x1, x2), c) -> x1 * c + x2 * (1 - c))
     ^<< first (vco tri &&& vco saw) -< (freq, envC)
   envA <- adsr <<< (arr (const (ADSR 0.02 0.1 0.8 0.05)) &&& gate) -< ()
-  filtered <- lp2 -< ((400, 1), wave)
-  returnA -< pan (-0.3) $ filtered * envA * dB (-6.5)
+  filtered <- lp1 -< (400, wave)
+  stereoReverb 0.61 0.2 -< mono $ filtered * envA * dB (-26)
 
 iBass = pitch >>> pitch2freq ^>> iBass'
 
 -- Bass melody
 
 mBass = scoped $ reGate (\x -> x - (1/16)) $ do
-  inst iBass; duration (1/2); music "v"
+  inst iBass; duration (1/2); music "vv"
   let segment = music "{3/2 1} {1/4 v5 ^1} . 1 5 1"
   mapM_ (\x -> scoped (music x >> segment)) ["+P1", "+m3", "+P4"]
   music "3/4 v6 6 2/4 6 3/4 7 7 2/4 7"
@@ -140,7 +140,7 @@ mDrumIntroRaw = scoped $ do
 mDrumIntro = do
   music "12/1 ."
   t <- syncInst
-  let env = mono . poly [(0, 0.5), (1, 0.7), (2, 0.7), (4, 1)]
+  let env = mono . poly [(0, 0.5), (2 - 0.01, 1.5), (2, 0.7), (4, 1)]
   reInst (\i -> t >>> ((const () ^>> i) &&& arr env) >>^ uncurry (*)) mDrumIntroRaw
 
 -- Main music arrangement
