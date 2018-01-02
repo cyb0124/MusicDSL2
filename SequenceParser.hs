@@ -2,7 +2,7 @@
 
 {-# LANGUAGE ExistentialQuantification #-}
 
-module SequenceParser(music) where
+module SequenceParser(music, musics) where
 import Control.Monad.State.Lazy
 import Text.Parsec.Char
 import Text.Parsec
@@ -39,7 +39,7 @@ rest = M.rest <$ char '.'
 -- Chord
 chord = do
   char '('
-  notes <- sepBy1 (evNote M.tone <|> up <|> down <|> evTranspose) spaces
+  notes <- sepBy (evNote M.tone <|> up <|> down <|> evTranspose) spaces
   char ')'
   return $ do
     s <- get
@@ -56,13 +56,23 @@ evTranspose = M.transpose <$> transpose
 -- Scoped
 evScoped = do
   char '{'
-  notes <- M.scoped <$> events
+  notes <- M.scoped <$> sequencedEvents
   char '}'
   return notes
 
+-- Grouped
+evGrouped = do
+  char '['
+  notes <- sequencedEvents
+  char ']'
+  return notes
+
 -- Event
-event = try evRatio <|> evNote M.note <|> rest <|> up <|> down <|> chord <|> evTranspose <|> evScoped
-events = foldl (>>) (return ()) <$> sepBy1 event spaces
+event = try evRatio <|> evNote M.note <|> rest <|> up <|> down <|> chord
+  <|> evTranspose <|> evScoped <|> evGrouped
+events = sepBy event spaces
+sequencedEvents = foldl (>>) (return ()) <$> events
 
 -- Exported function
-music = parseString events
+music = parseString sequencedEvents
+musics = parseString events

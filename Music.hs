@@ -3,7 +3,7 @@
 
 module Music(
   Time, Music, key, mode, bpm, transpose, rest, tone, note, inst, duration,
-  Event(..), TimedEvent(..), BPMChange(..), Note(..), getKey,
+  Event(..), TimedEvent(..), BPMChange(..), Note(..), getKey, diatonicTranspose,
   compileMusic, (<:>), getTime, getBPM, scoped, modal, reGate, getMode, reInst
 ) where
 import Control.Monad.Writer.Lazy
@@ -12,7 +12,7 @@ import Control.Arrow
 import Data.Functor.Identity
 import Data.Monoid
 import Data.Ratio
-import Data.List (sortOn)
+import Data.List (sortOn, elemIndex)
 import Instrument
 import Stereo
 import Theory
@@ -173,3 +173,26 @@ reGate f = reProp (\n -> n {nDuration = f $ nDuration n})
 -- change the instrument of all notes in a piece of music
 reInst :: (Inst () Stereo -> Inst () Stereo) -> Music a -> Music a
 reInst f = reProp (\n -> n {nInst = f $ nInst n})
+
+-- transpose a piece of music by a scale interval
+-- (useful for making chord progressions, parallel thirds, etc.)
+diatonicTranspose :: Int -> Music a -> Music a
+diatonicTranspose offset m = do
+  nowKey <- getKey
+  nowMode <- getMode
+  let nowScale = getScale nowMode
+      mapToScale x =
+        let
+          relative = x - nowKey
+          octave = relative `div` 12
+          pitch = relative `mod` 12
+          Just scaleDegree = elemIndex pitch nowScale
+        in octave * (length nowScale) + scaleDegree
+      mapToNote x =
+        let
+          octave = x `div` (length nowScale)
+          scaleDegree = x `mod` (length nowScale) + 1
+        in getPitch nowKey nowMode (ScaleDegree 0 scaleDegree) + 12 * octave
+      mapPitch x =
+        mapToNote $ (+offset) $ mapToScale $ x
+  reProp (\n -> n {nPitch = mapPitch $ nPitch n}) m
