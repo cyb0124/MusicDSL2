@@ -30,6 +30,17 @@ iPiano = proc () -> do
   envF <- adsr <<< (arr (const (ADSR 0.01 0.1 0.1 0.2)) &&& gate) -< ()
   simpleReverb <<< lp2 <<< arr fst &&& lp2 -< ((2000 + envF * 4000, 0.5), (w1 + w2) * envA)
 
+-- Synth Strings
+iStrings = proc () -> do
+  envLFO <- (\x -> 1 - exp (-x * 3)) ^<< localTime -< ()
+  lfo <- vco sin -< 2
+  freq <- pitch2freq ^<< pitch -< ()
+  w <- lChn ^<< unison (vco saw) 5 -< (25, 1, 1, 0, freq + lfo * envLFO * 3)
+  envA <- adsr <<< (arr (const (ADSR 0.2 1.5 0.4 0.05)) &&& gate) -< ()
+  envF <- adsr <<< (arr (const (ADSR 0.1 0.8 0.3 0.10)) &&& gate) -< ()
+  filtered <- lp2 -< ((4000 + envF * 8000, 0.5), w)
+  simpleReverb -< filtered * envA * dB (-6)
+
 -- Reverse Cymbal
 reverseCymbal = do
   inst $ proc () -> do
@@ -56,7 +67,7 @@ susM = sustain . music
 susMs = mapM_ sustain . musics
 when' p f = if p then f else id
 
--- Reusable rhythms and chords
+-- Some chords
 add9 = music "1/2 v1 5 ^1 2 {4/2 3}"
 powA = scoped $ susM "1/2 1 5 {^1} 5"
 powB = scoped $ susM "1/2 1 5 2/2 {^1}"
@@ -145,6 +156,14 @@ chorus = scoped $ do
         music "(6 ^4) {^3} {3/4 (5 ^2) 1/4 ^1} (1 5 ^1) 5 1/1 ^1"
   bassLine <:> melody <:> rep 8 drumLoop
 
+chorusStrings = scoped $ do
+  let bassLineA = music "{v1 5 6 3}"
+  music "2/1"; inst iStrings
+  bassLineA <:> music "^5 2 1 1/1 3 v7"
+  music "{v4 1 4/1 2}" <:> music "{^1} 1/1 5 ^3 2 b1 5 4"
+  bassLineA <:> music "1/1 5 ^3 2 v7 2/1 ^1 v7"
+  music "v4 1 {1/1 6 5} ^1" <:> music "(4 ^1) 5 {1/1 (6 ^3) (#7 ^2)} ^(1 v5)"
+
 -- Main music arrangement
 mainMusic = do
   bpm 80; key "G#3"; mode Minor; inst iPiano
@@ -153,5 +172,7 @@ mainMusic = do
   verseA; drumIntro
   chorus
   verseB; drumIntro
+  chorus <:> chorusStrings
+  scoped $ revert (4/1) >> reverseCymbal
 
 main = putWAVEFile "Example2.wav" $ toWav $ normalize $ synth $ compileMusic mainMusic
