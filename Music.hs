@@ -2,10 +2,10 @@
 -- For the instrument specification language, see Instrument.hs
 
 module Music(
-  Time, Music, key, mode, bpm, transpose, rest, tone, note, inst,
-  duration, Event(..), TimedEvent(..), BPMChange(..), Note(..), getKey,
-  diatonicTranspose, compileMusic, (<:>), getTime, getBPM, scoped, modal,
-  mapNote, reGate, getMode, reInst, reProp, arpeggio, sustain, simulate
+  Time, Music, key, mode, bpm, transpose, rest, tone, note, inst, duration,
+  Event(..), TimedEvent(..), BPMChange(..), Note(..), getKey, diatonicTranspose,
+  compileMusic, (<:>), getTime, getBPM, scoped, modal, mapNote, reGate, getMode,
+  reInst, reProp, arpeggio, sustain, simulate, muted, revert, hold, timeShift
 ) where
 import Control.Monad.Writer.Lazy
 import Control.Monad.State.Lazy
@@ -220,3 +220,22 @@ sustain x = do
         n {nDuration = endTime - nTime}
       f other = other
   censor (f <$>) x
+
+-- Remove all notes inside a piece of music but keep the state changes
+muted :: Music a -> Music a
+muted = censor $ const []
+
+-- Go backwards in time
+revert :: Time -> Music ()
+revert t = scoped $ duration (-t) >> rest
+
+-- Execute a piece of music without moving the time forward
+hold :: Music a -> Music a
+hold x = do
+  s <- get; y <- x
+  modify $ \s' -> s' {nsTime = nsTime s}
+  return y
+
+-- Shift the starting time of a piece of music
+timeShift :: Time -> Music a -> Music a
+timeShift x = censor (map $ \(TimedEvent nTime n) -> TimedEvent (nTime + x) n)

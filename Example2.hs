@@ -54,6 +54,7 @@ playChord c = playChords [c]
 rep n x = sequence_ $ replicate n x
 susM = sustain . music
 susMs = mapM_ sustain . musics
+when' p f = if p then f else id
 
 -- Reusable rhythms and chords
 add9 = music "1/2 v1 5 ^1 2 {4/2 3}"
@@ -61,7 +62,7 @@ powA = scoped $ susM "1/2 1 5 {^1} 5"
 powB = scoped $ susM "1/2 1 5 2/2 {^1}"
 sixth = music "1/4 {v3} 1"
 
--- The song separated in parts
+-- Intro
 intro = scoped $ do
   music "1/2"
   let melA = music "5 4 {^1} 4"
@@ -73,34 +74,51 @@ intro = scoped $ do
     (rep 2 melAB >> rep 2 melA) <:> chords
   arpeggio (1/16) $ music "3/1 (v1 5 ^1 ^1 4 5) 1/1 ."
 
+-- Verse
+arpLeadIn = arpeggio (1/24) $ music "5/4 (1 3 5)"
+motifVM1 offset = do
+  timeShift offset $ music "1/4 1 3 5"
+  mapM_ (arpeggio $ 1/24) $ (music "1/1 (2 4)" <:>) <$> musics "[] 7"
+motifVM2 = do
+  mapM (rhythm "3/4 1/4") $ musics <$> ["4 [^2]", "1 b1"]
+  music "1/1 1 5 1"; arpeggio (1/24) $ music "(3 5)"
+  music "1/2 4 {1/6 4 5 4} 2 {v7} 7/2 1 1/2 v5"
+motifVM3 = do
+  music "1/2 4 #7 ^1 2"; playChord sixth [2, 1, 0, -1]
+  rep 4 $ music "1 5 4 5"; rep 3 $ music "1 5 #3 5"
+motifVB1 = susM "1/2 {v6} 3/2 3"
+motifVB2 = do
+  susM "1/2 {v7} 4 {1/1 7}"; playChord powA [-3, 0, -2, -1]
+  susM "1 5 {^1 2 3} 5 {1/1 ^1}"
+motifVB3 = modal Major $ playChord (sustain add9) [7]
+
 verseA = scoped $ do
   music "1/2"
-  let bassLine = scoped $ music "v" >> do
-        music ". {3/2 3}"; susM "{v7} 4 {1/1 7}"; playChord powA [-3, 0, -2, -1]
-        susM "1 5 {^1 2 3} 5 {1/1 ^1}"; susM "1/2 {v6} 3/2 3"
-        playChord powB [-1, -3]; susM "1/2 {v1} 3/2 5"; playChord powB [-2, -1]
-        modal Major $ playChord (sustain add9) [7]
-      patternA = do
-        music "1/4 1 3 5"
-        mapM_ (arpeggio $ 1/24) $ (music "1/1 (2 4)" <:>) <$> musics "[] 7"
-      melody = do
-        music "5/4 5"; patternA
-        mapM (rhythm "3/4 1/4") $ musics <$> ["4 [^2]", "1 b1"]
-        music "1/1 1 5 1"; arpeggio (1/24) $ music "(3 5)"
-        music "1/2 4 {1/6 4 5 4} 2 {v7} 7/2 1 1/2 v5"
-        arpeggio (1/24) $ music "5/4 (1 3 5)"; patternA
-        music "1/2 4 #7 ^1 2"
-        playChord sixth [2, 1, 0, -1]
-        rep 4 $ music "1 5 4 5"
-        rep 3 $ music "1 5 #3 5"
-        music "1/2 1 v5"
+  let melody = do
+        music "5/4 5"; motifVM1 0; motifVM2;
+        arpLeadIn; motifVM1 0; motifVM3; music "1/2 1 v5"
+      bassLine = scoped $ music "v" >> do
+        music ". {3/2 3}"; motifVB2; motifVB1
+        playChord powB [-1, -3]; susM "1/2 {v1} 3/2 5";
+        playChord powB [-2, -1]; motifVB3
   bassLine <:> melody
 
-drumIntro = scoped $ do
-  duration (-4/1); rest
-  reverseCymbal <:> do
-    music "2/1 . 1/2"
-    playDrums [iKick, iSnare, iHat] [". 1 1 1", ". . 1 .", ". 1 1 1"]
+verseB = scoped $ do
+  music "1/2"
+  let melody = do
+        arpLeadIn; motifVM1 (-1/11); motifVM2;
+        arpLeadIn; motifVM1 (-1/11); motifVM3 <:> music "1/2 2 2"; music "1/1 1"
+      bassLine = scoped $ music "v" >> do
+        motifVB1; motifVB2; playChord powB [-2, -1, -3, 0, -2, -1]; motifVB3
+      drumEnd = music "1/2" >> playDrums [iSnare, iHat]
+        ["1", unwords $ replicate 13 "1"]
+  bassLine <:> melody <:> rep 8 drumLoop
+  bassLine <:> melody <:> (rep 6 drumLoop >> drumEnd)
+
+-- Chorus
+drumIntro = scoped $ revert (4/1) >> reverseCymbal <:> do
+  music "2/1 . 1/2"
+  playDrums [iKick, iSnare, iHat] [". 1 1 1", ". . 1 .", ". 1 1 1"]
 
 drumLoop = music "1/2" >> playDrums [iKick, iSnare, iHat]
   ["1 . . . . 1 . .", ". . 1 . . . 1 .", "1 1 1 1 1 1 1 1"]
@@ -130,6 +148,10 @@ chorus = scoped $ do
 -- Main music arrangement
 mainMusic = do
   bpm 80; key "G#3"; mode Minor; inst iPiano
-  intro; bpm 100; verseA; drumIntro; chorus
+  intro
+  bpm 100
+  verseA; drumIntro
+  chorus
+  verseB; drumIntro
 
 main = putWAVEFile "Example2.wav" $ toWav $ normalize $ synth $ compileMusic mainMusic
