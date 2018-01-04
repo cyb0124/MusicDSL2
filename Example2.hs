@@ -14,6 +14,12 @@ import DrumLib
 import Instrument
 import SequenceParser
 
+-- CPU-friendly reverb
+simpleReverb = proc dry -> do
+  l <- fbDelay $ delayLine 0 0.084 >>> (\x -> ((2000, 0.5), x * 0.6)) ^>> lp2 -< dry
+  r <- fbDelay $ delayLine 0 0.103 >>> (\x -> ((2000, 0.5), x * 0.6)) ^>> lp2 -< dry
+  returnA -< mono (dry * 0.5) + Stereo l r * mono 0.5
+
 -- Electric Piano Synthesizer
 iPiano = proc () -> do
   freq <- pitch2freq ^<< pitch -< ()
@@ -22,11 +28,25 @@ iPiano = proc () -> do
   w2 <- (* dB (-20)) ^<< vco saw -< freq * (2 ** ((12.03 + sweep * 12) / 12))
   envA <- adsr <<< (arr (const (ADSR 0.01 0.3 0.3 0.2)) &&& gate) -< ()
   envF <- adsr <<< (arr (const (ADSR 0.01 0.1 0.1 0.2)) &&& gate) -< ()
-  dry <- lp2 <<< arr fst &&& lp2 -< ((2000 + envF * 4000, 0.5), (w1 + w2) * envA)
-  -- CPU-friendly reverb
-  l <- fbDelay $ delayLine 0 0.084 >>> (\x -> ((2000, 0.5), x * 0.6)) ^>> lp2 -< dry
-  r <- fbDelay $ delayLine 0 0.103 >>> (\x -> ((2000, 0.5), x * 0.6)) ^>> lp2 -< dry
-  returnA -< mono (dry * 0.5) + Stereo l r * mono 0.5
+  simpleReverb <<< lp2 <<< arr fst &&& lp2 -< ((2000 + envF * 4000, 0.5), (w1 + w2) * envA)
+
+-- Reverse Cymbal
+reverseCymbal = do
+  inst $ proc () -> do
+    envA <- adsr <<< (arr (const $ ADSR 3 1 1 0.1) &&& id) <<< gate -< ()
+    w1 <- noise -< ()
+    w2 <- fm (vco tri) (vco sin) -< (1.2, 4, 1500)
+    let f0 = 0.8 * w1 + 0.2 * w2
+    f1 <- lp2 -< ((6000, 0.5), f0)
+    f2 <- hp2 -< ((400, 0.5), f1)
+    stereoReverb 0.5 0.3 0.5 -< mono $ envA * f2 * dB (-45)
+  music "4/1 1"
+
+-- Drums
+iKick = kick' 0.8 >>^ mono . (* dB (-13))
+iSnare = snare >>> (* dB (-11)) ^>> simpleReverb
+iHat = hihat >>^ pan 0.2 . (* dB (-20))
+playDrums drums xs = foldr1 (<:>) $ zipWith (\i m -> inst i >> music m) drums xs
 
 -- Utility functions
 playChord c = mapM_ $ \x -> diatonicTranspose x c
@@ -77,14 +97,21 @@ verse = scoped $ do
         music "1/2 1 v5"
   bassLine <:> melody
 
+drumIntro = scoped $ do
+  duration (-4/1); rest
+  reverseCymbal <:> do
+    music "2/1 . 1/2"
+    playDrums [iKick, iSnare, iHat] [". 1 1 1", ". . 1 .", ". 1 1 1"]
+
 -- Main music arrangement
 mainMusic = do
   bpm 80
   key "G#3"
   mode Minor
-  -- intro
+  intro
   bpm 100
   verse
+  drumIntro
 
 main = putWAVEFile "Example2.wav" $ toWav $ synth $ compileMusic mainMusic
 

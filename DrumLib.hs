@@ -2,7 +2,7 @@
 
 {-# LANGUAGE Strict, StrictData #-}
 
-module DrumLib(kick', kick, hihat, ride, snare) where
+module DrumLib(kick', kick, hihat, ride, snare', snare) where
 import Prelude hiding ((.), id)
 import Control.Category
 import Control.Arrow
@@ -44,13 +44,15 @@ ride =
   in localTime >>> ((noise >>> filterInput ^>> hp2) &&& osc &&& id) >>^ mix
 
 -- Snare drum
-snare :: Inst p Double
-snare =
+snare' :: Double -> Inst p Double
+snare' pitch =
   let
-    freq = poly [(0, 9000), (0.01, 800), (0.03, 200)]
+    freq = (*pitch) <$> poly [(0, 9000), (0.01, 800), (0.03, 200)]
     sAmp = dB . poly [(0, -60), (0.01, 0), (0.03, 0), (0.15, -40), (0.2, -1/0)]
     nAmp = dB . poly [(0, -60), (0.02, -8), (0.04, 0), (0.2, -30), (0.3, -60), (0.4, -1/0)]
-    cutoff = poly [(0, 20000), (0.1, 10000), (0.2, 8000), (0.3, 400)]
+    cutoff = min 20000 <$> (*pitch) <$> poly [(0, 20000), (0.1, 10000), (0.2, 8000), (0.3, 400)]
     distort x = tanh x
     mix (sWave, (nWave, t)) = distort $ sWave * sAmp t + nWave * nAmp t
   in localTime >>> ((freq ^>> vco tri) &&& ((arr cutoff &&& noise) >>> lp1) &&& id) >>^ mix
+
+snare = snare' 1
