@@ -33,8 +33,8 @@ mLead = scoped $ do
       rhythmB = rhythm "1/1 1/1 2/1"
       rhythmC = rhythm "2/1 1/1 1/1"
       rhythmD = rhythm "3/2 3/2 2/2"
-  -- Accompany each note with a fixed note
-      par1 r n m = r (musics m) <:> r (repeat $ scoped $ music n)
+  -- Oblique motion
+      oblique r n m = r (musics m) <:> r (repeat $ scoped $ music n)
   -- Parallel thirds
       par3 x = x <:> diatonicTranspose (-2) x
   rhythmA $ musics "[v6] 6 6 6 5 6"
@@ -45,10 +45,10 @@ mLead = scoped $ do
   music "4/1 5 3/1 ^1 1/1 v7"
   par3 $ rhythmA $ musics "[^1] 1 1 1 2 1"
   par3 $ rhythmB $ musics "2 3 4"
-  par1 rhythmA "v#7" "5 6 5 4 3 2"
-  par1 rhythmC "v5" "3 2 1"
-  par1 rhythmD "(v3 6)" "1 2 3"
-  par1 rhythmD "(v4 7)" "2 {v7} 2"
+  oblique rhythmA "v#7" "5 6 5 4 3 2"
+  oblique rhythmC "v5" "3 2 1"
+  oblique rhythmD "(v3 6)" "1 2 3"
+  oblique rhythmD "(v4 7)" "2 {v7} 2"
   music "4/1 #3 ^1" <:> music "8/1 (1 v5)"
 
 -- Bass instrument
