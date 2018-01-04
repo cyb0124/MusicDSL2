@@ -5,7 +5,7 @@ module Music(
   Time, Music, key, mode, bpm, transpose, rest, tone, note, inst,
   duration, Event(..), TimedEvent(..), BPMChange(..), Note(..), getKey,
   diatonicTranspose, compileMusic, (<:>), getTime, getBPM, scoped, modal,
-  mapNote, reGate, getMode, reInst, reProp, arpeggio
+  mapNote, reGate, getMode, reInst, reProp, arpeggio, sustain, simulate
 ) where
 import Control.Monad.Writer.Lazy
 import Control.Monad.State.Lazy
@@ -163,10 +163,7 @@ mapNote _ other = other
 
 -- change some properties of all notes in a piece of music
 reProp :: (Note -> Note) -> Music a -> Music a
-reProp f x = do
-  (y, notes) <- lift $ runWriterT x
-  tell $ mapNote f <$> notes
-  return y
+reProp f = censor (mapNote f <$>)
 
 -- change the duration of all notes in a piece of music
 reGate :: (Time -> Time) -> Music a -> Music a
@@ -207,7 +204,19 @@ arpeggio t x =
       TimedEvent nTime (EvNote n) -> TimedEvent (nTime + t * i) $ EvNote $
         n {nDuration = nDuration n - t * i}
       other -> other
-  in do
-    (y, notes) <- lift $ runWriterT x
-    tell $ zipWith f [0..] notes
-    return y
+  in censor (zipWith f [0..]) x
+
+-- Evaluate a music monad without producing any events or changing the state
+simulate :: Music a -> Music a
+simulate x = do
+  s <- get
+  return $ runIdentity $ evalStateT (fst <$> runWriterT x) s
+
+-- Sustain pedal
+sustain :: Music a -> Music a
+sustain x = do
+  endTime <- simulate $ x >> getTime
+  let f (TimedEvent nTime (EvNote n)) = TimedEvent nTime $ EvNote $
+        n {nDuration = endTime - nTime}
+      f other = other
+  censor (f <$>) x

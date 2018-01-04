@@ -2,7 +2,7 @@
 
 {-# LANGUAGE GADTs, Strict, StrictData #-}
 
-module Synth(synth, toWav, sampFreq) where
+module Synth(synth, toWav, sampFreq, normalize) where
 import System.Random
 import Control.Monad
 import Control.Monad.ST
@@ -135,3 +135,10 @@ doubleToSampleChecked x =
   if x > 1 then trace "clip" $ doubleToSample 1
   else if x < -1 then trace "clip" $ doubleToSample (-1)
   else doubleToSample x
+
+-- Make maximum volume 0 dB
+normalize :: [Stereo] -> [Stereo]
+normalize xs = (* mono scale) <$> xs where
+  maxL = maximum $ abs . lChn <$> xs
+  maxR = maximum $ abs . rChn <$> xs
+  scale = recip $ max maxL maxR

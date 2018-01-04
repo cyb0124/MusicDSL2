@@ -33,7 +33,7 @@ iPiano = proc () -> do
 -- Reverse Cymbal
 reverseCymbal = do
   inst $ proc () -> do
-    envA <- adsr <<< (arr (const $ ADSR 3 1 1 0.1) &&& id) <<< gate -< ()
+    envA <- adsr <<< (arr (const $ ADSR 3 1 1 0.13) &&& id) <<< gate -< ()
     w1 <- noise -< ()
     w2 <- fm (vco tri) (vco sin) -< (1.2, 4, 1500)
     let f0 = 0.8 * w1 + 0.2 * w2
@@ -43,24 +43,27 @@ reverseCymbal = do
   music "4/1 1"
 
 -- Drums
-iKick = kick' 0.8 >>^ mono . (* dB (-13))
+iKick = kick' 0.8 >>^ mono. (* dB (-6))
 iSnare = snare >>> (* dB (-11)) ^>> simpleReverb
 iHat = hihat >>^ pan 0.2 . (* dB (-20))
 playDrums drums xs = foldr1 (<:>) $ zipWith (\i m -> inst i >> music m) drums xs
 
 -- Utility functions
-playChord c = mapM_ $ \x -> diatonicTranspose x c
+playChords cs xs = sequence_ $ zipWith diatonicTranspose xs $ cycle cs
+playChord c = playChords [c]
 rep n x = sequence_ $ replicate n x
+susM = sustain . music
+susMs = mapM_ sustain . musics
 
 -- Reusable rhythms and chords
 add9 = music "1/2 v1 5 ^1 2 {4/2 3}"
-powA = scoped $ music "1/2 1 5 {^1} 5"
-powB = scoped $ music "1/2 1 5 2/2 {^1}"
+powA = scoped $ susM "1/2 1 5 {^1} 5"
+powB = scoped $ susM "1/2 1 5 2/2 {^1}"
 sixth = music "1/4 {v3} 1"
 
 -- The song separated in parts
 intro = scoped $ do
-  inst iPiano; music "1/2"
+  music "1/2"
   let melA = music "5 4 {^1} 4"
       melB = music "5 4 1 4"
       melAB = melA >> melB
@@ -70,17 +73,13 @@ intro = scoped $ do
     (rep 2 melAB >> rep 2 melA) <:> chords
   arpeggio (1/16) $ music "3/1 (v1 5 ^1 ^1 4 5) 1/1 ."
 
-verse = scoped $ do
-  inst iPiano; music "1/2"
+verseA = scoped $ do
+  music "1/2"
   let bassLine = scoped $ music "v" >> do
-        music ". {1/1 3} . {v7} 4 {1/1 7}"
-        playChord powA [-3, 0, -2, -1]
-        music "1 5 {^1 2 3} 5 {1/1 ^1}"
-        music "1/2 {v6} 3/2 3"
-        playChord powB [-1, -3]
-        music "1/2 {v1} 3/2 5"
-        playChord powB [-2, -1] 
-        modal Major $ playChord add9 [7]
+        music ". {3/2 3}"; susM "{v7} 4 {1/1 7}"; playChord powA [-3, 0, -2, -1]
+        susM "1 5 {^1 2 3} 5 {1/1 ^1}"; susM "1/2 {v6} 3/2 3"
+        playChord powB [-1, -3]; susM "1/2 {v1} 3/2 5"; playChord powB [-2, -1]
+        modal Major $ playChord (sustain add9) [7]
       patternA = do
         music "1/4 1 3 5"
         mapM_ (arpeggio $ 1/24) $ (music "1/1 (2 4)" <:>) <$> musics "[] 7"
@@ -103,15 +102,34 @@ drumIntro = scoped $ do
     music "2/1 . 1/2"
     playDrums [iKick, iSnare, iHat] [". 1 1 1", ". . 1 .", ". 1 1 1"]
 
+drumLoop = music "1/2" >> playDrums [iKick, iSnare, iHat]
+  ["1 . . . . 1 . .", ". . 1 . . . 1 .", "1 1 1 1 1 1 1 1"]
+
+chorus = scoped $ do
+  music "1/4"
+  let oblique c xs = scoped $ mapM_ (\x -> x >> music c) $ musics xs
+      start = do
+        oblique "{v5}" "3 2 3 4"; oblique "{v2}" "2 1 {v7}"; music "v5 7^"
+        oblique "{v3}" "1 {v7} 1 3 {v7} {v6} {v5}"; music "v5 7"
+      melody = music "^" >> do
+        start; oblique "1" "6 5 4 6"; oblique "{v5}" "5 4 3 5"
+        oblique "{v6}" "4 3 2 1"; music "{1/2 (b1 v2) 1 2 v5}"
+        start; music "{1/2 6} ^6 5 4 3 {1/2 2} 5 4 5 6 5 4 3 2 1/2"
+        oblique "5" "1 b1"; music "2/1 1"
+      chordA = susM "{1 5 ^3 1}"
+      chordB = susM "{1 5 ^1 3}"
+      bassLine = scoped $ music "vv 1/2" >> do
+        susMs "{1 ^5 ^2 1} {{v5} ^#6 1/1 7} {{v6} ^3 ^1 v6} {{v3} ^3 1/1 5}"
+        susMs "{(v4 ^4) ^^{1/4 (1 6) 5 4 3} 2} {(v2 ^2) ^^1/4 (5 v5) 4 3 2 1 v7}"
+        susMs "{3/4 (v6 ^6) 1/4 ^7 ^1 2 3 5} {(v5 ^5) ^^3 1/1 2}"
+        playChords [chordA, chordB] [0, -3, -2, -5]
+        playChord (sustain powB) [3, 0]
+        music "(6 ^4) {^3} {3/4 (5 ^2) 1/4 ^1} (1 5 ^1) 5 1/1 ^1"
+  bassLine <:> melody <:> rep 8 drumLoop
+
 -- Main music arrangement
 mainMusic = do
-  bpm 80
-  key "G#3"
-  mode Minor
-  intro
-  bpm 100
-  verse
-  drumIntro
+  bpm 80; key "G#3"; mode Minor; inst iPiano
+  intro; bpm 100; verseA; drumIntro; chorus
 
-main = putWAVEFile "Example2.wav" $ toWav $ synth $ compileMusic mainMusic
-
+main = putWAVEFile "Example2.wav" $ toWav $ normalize $ synth $ compileMusic mainMusic
