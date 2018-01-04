@@ -85,8 +85,8 @@ mBass = scoped $ reGate (\x -> x - (1/16)) $ do
   c "{v6}"; c "{v7}"
 
 mBassIntro = scoped $ reGate (\x -> x - (1/16)) $ do
-  duration (-1/1)
-  music ". 1/1 vv"
+  revert $ 1/1
+  music "1/1 vv"
   t <- syncInst
   inst $ (t &&& (pitch >>^ pitch2freq)) >>>
     (\(t, f) -> poly [(0, 100), (1, f)] t) ^>> iBass'
@@ -114,7 +114,8 @@ mDrumA = scoped $ music "1/2" >> playDrums [iHat, iRide, iKick, iSnare] [
 
 -- Drum loop A to B
 mDrumAB = scoped $ do
-  duration (-2/4); music ". 1/4"
+  revert $ 2/4
+  music "1/4"
   playDrums [iSnare >>^ (* mono (dB (-6)))] ["1 1"]
 
 -- Drum loop B
