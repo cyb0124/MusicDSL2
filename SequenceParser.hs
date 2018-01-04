@@ -2,7 +2,7 @@
 
 {-# LANGUAGE ExistentialQuantification #-}
 
-module SequenceParser(music, musics) where
+module SequenceParser(music, musics, rhythm) where
 import Control.Monad.State.Lazy
 import Text.Parsec.Char
 import Text.Parsec
@@ -73,6 +73,12 @@ event = try evRatio <|> evNote M.note <|> rest <|> up <|> down <|> chord
 events = sepBy event spaces
 sequencedEvents = foldl (>>) (return ()) <$> events
 
--- Exported function
+-- Parse a string as a single piece of music
 music = parseString sequencedEvents
+
+-- Parse a string as a list of pieces of music
 musics = parseString events
+
+-- Reuse the same rhythm for different melodies
+rhythm :: String -> [M.Music ()] -> M.Music ()
+rhythm x melody = sequence_ $ zipWith (>>) (musics x) melody

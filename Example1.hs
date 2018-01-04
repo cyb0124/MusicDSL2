@@ -11,23 +11,34 @@ import DrumLib
 import Instrument
 import SequenceParser
 
-drumLoop =
-  let kicks = do
-        inst $ kick >>^ (*0.5) >>^ mono
-        music "1 . . 1 1 . . ."
-      hats = do
-        inst $ hihat >>^ (*0.1) >>^ pan (-0.2)
-        music "1 1 1 1 1 1 1 1"
-      snares = do
-        inst $ snare >>^ (*0.3) >>^ pan (0.2)
-        music ". . 1 . . . 1 ."
-      rides = do
-        inst $ ride >>^ (*0.1) >>^ pan (0.3)
-        music ". . . . . . . 1"
-  in music "1/2" >> kicks <:> hats <:> snares <:> rides
+drums = [
+    kick >>^ (*0.5) >>^ mono,
+    hihat >>^ (*0.1) >>^ pan (-0.2),
+    snare >>^ (*0.3) >>^ pan (0.2),
+    ride >>^ (*0.1) >>^ pan (0.3)
+  ]
 
-testMusic = do
+playDrums xs = sequence_ $ replicate 4 $
+  foldr1 (<:>) $ zipWith (\i m -> inst i >> music m) drums xs
+
+drumLoopA = [
+    "1 . . 1 1 . . .",
+    "1 1 1 1 1 1 1 1",
+    ". . 1 . . . 1 .",
+    ". . . . . . . 1"
+  ]
+
+drumLoopB = [
+    "1 . . . 1 1 . .",
+    "{1/4 . 1 1 1 1 . 1 1} 1 1 1 1",
+    ". . 1 . . . 1 .",
+    ". . . . . . . 1"
+  ]
+
+mainMusic = do
   bpm 128
-  sequence_ $ replicate 4 drumLoop
+  music "1/2"
+  playDrums drumLoopA
+  playDrums drumLoopB
 
-main = putWAVEFile "Example1.wav" $ toWav $ synth $ compileMusic testMusic
+main = putWAVEFile "Example1.wav" $ toWav $ synth $ compileMusic mainMusic

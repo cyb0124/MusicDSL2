@@ -2,9 +2,10 @@
 -- For the instrument specification language, see Instrument.hs
 
 module Music(
-  Time, Music, key, mode, bpm, transpose, rest, tone, note, inst, duration,
-  Event(..), TimedEvent(..), BPMChange(..), Note(..), getKey, diatonicTranspose,
-  compileMusic, (<:>), getTime, getBPM, scoped, modal, reGate, getMode, reInst
+  Time, Music, key, mode, bpm, transpose, rest, tone, note, inst,
+  duration, Event(..), TimedEvent(..), BPMChange(..), Note(..), getKey,
+  diatonicTranspose, compileMusic, (<:>), getTime, getBPM, scoped, modal,
+  mapNote, reGate, getMode, reInst, reProp, arpeggio
 ) where
 import Control.Monad.Writer.Lazy
 import Control.Monad.State.Lazy
@@ -155,16 +156,17 @@ modal m x = do
   mode old
   return y
 
+-- Apply note transformation to note event
+mapNote :: (Note -> Note) -> TimedEvent -> TimedEvent
+mapNote f (TimedEvent time (EvNote n)) = TimedEvent time $ EvNote $ f n
+mapNote _ other = other
+
 -- change some properties of all notes in a piece of music
 reProp :: (Note -> Note) -> Music a -> Music a
-reProp f x =
-  let
-    f' (TimedEvent time (EvNote n)) = TimedEvent time $ EvNote $ f n
-    f' other = other
-  in do
-    (y, notes) <- lift $ runWriterT x
-    tell $ f' <$> notes
-    return y
+reProp f x = do
+  (y, notes) <- lift $ runWriterT x
+  tell $ mapNote f <$> notes
+  return y
 
 -- change the duration of all notes in a piece of music
 reGate :: (Time -> Time) -> Music a -> Music a
@@ -196,3 +198,16 @@ diatonicTranspose offset m = do
       mapPitch x =
         mapToNote $ (+offset) $ mapToScale $ x
   reProp (\n -> n {nPitch = mapPitch $ nPitch n}) m
+
+-- Arpeggio
+arpeggio :: Time -> Music a -> Music a
+arpeggio t x =
+  let
+    f i = \x -> case x of
+      TimedEvent nTime (EvNote n) -> TimedEvent (nTime + t * i) $ EvNote $
+        n {nDuration = nDuration n - t * i}
+      other -> other
+  in do
+    (y, notes) <- lift $ runWriterT x
+    tell $ zipWith f [0..] notes
+    return y

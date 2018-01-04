@@ -17,26 +17,25 @@ import SequenceParser
 -- Lead instrument
 iLead = proc () -> do
   envLFO <- (\x -> 1 - exp (-x * 3)) ^<< localTime -< ()
-  lfo <- vco sin -< 6
-  wave <- vco analogSaw <<< (\(x, y) -> pitch2freq x + y) ^<< (pitch &&& id)
+  lfo <- vco sin -< 6 -- Vibrato
+  wave <- vco analogSaw <<< uncurry (+) ^<< ((pitch2freq ^<< pitch) &&& id)
     -< lfo * envLFO * 5
   envA <- adsr <<< (arr (const (ADSR 0.01 0.5 0.2 0.05)) &&& gate) -< ()
   envF <- adsr <<< (arr (const (ADSR 0.01 0.2 1E-6 1E-6)) &&& gate) -< ()
   filtered <- lp1 -< (4000 + envF * 12000, wave)
-  stereoReverb 0.84 0.2 0.5 -< mono $ filtered * envA * dB (-38)
+  stereoReverb 0.5 0.2 0.5 -< mono $ filtered * envA * dB (-38)
 
 -- Lead music
 mLead = scoped $ do
   inst iLead
-  -- Reuse the same rhythm for different melodies
-  let rhythm x melody = sequence_ $ zipWith (>>) (musics x) melody
-      rhythmA = rhythm "1/1 1/2 1/1 1/2 [] []"
+  -- Define rhythm patterns
+  let rhythmA = rhythm "1/1 1/2 1/1 1/2 [] []"
       rhythmB = rhythm "1/1 1/1 2/1"
       rhythmC = rhythm "2/1 1/1 1/1"
       rhythmD = rhythm "3/2 3/2 2/2"
-  -- Automatically accompany each note with a fixed note
-      parSingle r n m = r (musics m) <:> r (repeat $ scoped $ music n)
-  -- Automatic parallel thirds
+  -- Accompany each note with a fixed note
+      par1 r n m = r (musics m) <:> r (repeat $ scoped $ music n)
+  -- Parallel thirds
       par3 x = x <:> diatonicTranspose (-2) x
   rhythmA $ musics "[v6] 6 6 6 5 6"
   rhythmA $ musics "7 [^1] 2 1 [v7] 4"
@@ -46,10 +45,10 @@ mLead = scoped $ do
   music "4/1 5 3/1 ^1 1/1 v7"
   par3 $ rhythmA $ musics "[^1] 1 1 1 2 1"
   par3 $ rhythmB $ musics "2 3 4"
-  parSingle rhythmA "v#7" "5 6 5 4 3 2"
-  parSingle rhythmC "v5" "3 2 1"
-  parSingle rhythmD "(v3 6)" "1 2 3"
-  parSingle rhythmD "(v4 7)" "2 {v7} 2"
+  par1 rhythmA "v#7" "5 6 5 4 3 2"
+  par1 rhythmC "v5" "3 2 1"
+  par1 rhythmD "(v3 6)" "1 2 3"
+  par1 rhythmD "(v4 7)" "2 {v7} 2"
   music "4/1 #3 ^1" <:> music "8/1 (1 v5)"
 
 -- Bass instrument
@@ -59,7 +58,7 @@ iBass = proc () -> do
     ^<< ((vco tri &&& vco saw <<< pitch2freq ^<< pitch) &&& id) -< envC
   envA <- adsr <<< (arr (const (ADSR 0.02 0.1 0.8 0.05)) &&& gate) -< ()
   filtered <- lp1 -< (400, wave)
-  stereoReverb 0.84 0.2 0.5 -< mono $ filtered * envA * dB (-43)
+  stereoReverb 0.84 0.2 0.5 -< mono $ filtered * envA * dB (-40)
 
 -- Bass music
 mBass = scoped $ do

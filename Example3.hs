@@ -23,16 +23,16 @@ iLead = proc () -> do
   coupled <- hp1 -< (20, filtered) -- AC coupling
   stereoReverb 0.84 0.2 0.5 -< pan 0.2 $ envA * coupled * dB (-52)
 
+-- Define rhythm patterns
+rhythm' r x = rhythm r $ repeat $ music x
+a = rhythm' "3/2 [] 1/2 []"
+b = rhythm' "3/2 [] 2/2"
+c = rhythm' "3/4 [] 2/4"
+
 -- Lead melody
-mLead = do
-  inst iLead; duration (3/2)
-  scoped $ mapM_ music $ [
-      "1 1 {1/2 1 1}",
-      "3 3 {2/2 3}",
-      "4 4 {1/2 4 4}", "v 3/4",
-      "6 6 {2/4 6}",
-      "7 7 {2/4 7}"
-    ]
+mLead = scoped $ do
+  inst iLead
+  a "1"; b "3"; a "4"; c "{v6}" ; c "{v7}"
 
 -- Make a fade-in effect using LP2
 fadeInLP2 :: (Double -> Double) -> (Double -> Double) -> Double -> Music a -> Music a
@@ -56,12 +56,12 @@ iPad = do
 
 -- Pad melody
 mPad = do
-  inst =<< iPad; duration (4/1)
-  let chord = music "(1 ^1 #3 5 ^1)"
-  mapM_ (\x -> scoped (music x >> chord)) [
-    "+P1", "+m3", "+P4",
-    "1/4 +m6", "1/4 . . +m6", "1/4 . . +m6",
-    "1/4 . +m7", "1/4 . . +m7", "1/4 . . +m7"]
+  inst =<< iPad; music "4/1"
+  let chord x = scoped $ music x >> music "(1 ^1 #3 5 ^1)"
+      rhythm m = music "1/4" >> forM_ [1, 0, 0, 1, 0, 0, 1, 0] (\x ->
+        if toEnum x then m else rest)
+  mapM_ chord ["+P1", "+m3", "+P4"]
+  mapM_ (rhythm . chord) ["+m6", "+m7"]
 
 mPadIntro = fadeInLP2 (poly [(0, 100), (4, 4000), (8, 4000), (12, 8000)])
   (poly [(0, 0), (12 - 0.01, 0), (12, 1)]) 1 mPad
@@ -78,19 +78,21 @@ iBass' = proc freq -> do
 iBass = pitch >>> pitch2freq ^>> iBass'
 
 -- Bass melody
-
 mBass = scoped $ reGate (\x -> x - (1/16)) $ do
-  inst iBass; duration (1/2); music "vv"
+  inst iBass; music "1/2 vv"
   let segment = music "{3/2 1} {1/4 v5 ^1} . 1 5 1"
-  mapM_ (\x -> scoped (music x >> segment)) ["+P1", "+m3", "+P4"]
-  music "3/4 v6 6 2/4 6 3/4 7 7 2/4 7"
+  mapM_ (\x -> scoped $ music x >> segment) ["+P1", "+m3", "+P4"]
+  c "{v6}"; c "{v7}"
 
 mBassIntro = scoped $ reGate (\x -> x - (1/16)) $ do
-  duration (-1/1); rest; duration (1/1); t <- syncInst
-  target <- (/4) <$> pitch2freq <$> getKey
-  inst $ t >>> poly [(0, 100), (1, target)] ^>> iBass'; music "1"
-  inst iBass; music "4/1 vv"
-  music "1 3 4 2/1 6 7"
+  duration (-1/1)
+  music ". 1/1 vv"
+  t <- syncInst
+  inst $ (t &&& (pitch >>^ pitch2freq)) >>>
+    (\(t, f) -> poly [(0, 100), (1, f)] t) ^>> iBass'
+  music "1"
+  inst iBass
+  music "4/1 1 3 4 2/1 6 7"
 
 -- Drum instruments
 iHat = hihat >>^ pan 0.2 . (* dB (-20))
@@ -100,51 +102,50 @@ iTom x = kick' x >>^ mono . (* dB (-13))
 iSnare = snare >>^ mono . (* dB (-17))
 iSnare2 = iSnare >>> (\x -> (4000, x)) ^>> stereoFilter lp1
 
+playDrums drums xs = foldr1 (<:>) $ zipWith (\i m -> inst i >> music m) drums xs
+
 -- Drum loop A
-mDrumA = scoped $ do
-  music "1/2"
-  let hats = inst iHat >> music     "1 1 1      1   1   1    1 1"
-      rides = inst iRide >> music   ". . 1      .   .   .    1 ."
-      kicks = inst iKick >> music   "1 1 . {1/4 1 . 1 . 1 .} . 1"
-      snares = inst iSnare >> music ". . 1 {1/4 . 1 . 1 . .} 1 ."
-  hats <:> kicks <:> snares <:> rides
+mDrumA = scoped $ music "1/2" >> playDrums [iHat, iRide, iKick, iSnare] [
+    "1 1 1      1   1   1    1 1",
+    ". . 1      .   .   .    1 .",
+    "1 1 . {1/4 1 . 1 . 1 .} . 1",
+    ". . 1 {1/4 . 1 . 1 . .} 1 ."
+  ]
 
 -- Drum loop A to B
 mDrumAB = scoped $ do
-  duration (-2/4); rest; music "1/4";
-  inst $ iSnare >>^ (* mono (dB (-6)))
-  music "1 1"
+  duration (-2/4); music ". 1/4"
+  playDrums [iSnare >>^ (* mono (dB (-6)))] ["1 1"]
 
 -- Drum loop B
-mDrumB = scoped $ do
-  music "1/4"
-  let kicks = inst iKick >> music   "{3/4 1 1 {2/4 1}}"
-      snares = inst iSnare2 >> music ". 1 1 . 1 1 . 1"
-      hats = inst iHat >> music     "1 1 1 1 1 1 1 1"
-      rides = inst iRide >> music   ". . 1 . . 1 . 1"
-  kicks <:> snares <:> hats <:> rides
+mDrumB = scoped $ music "1/4" >> playDrums [iKick, iSnare2, iHat, iRide] [
+    "1 . . 1 . . 1 .",
+    ". 1 1 . 1 1 . 1",
+    "1 1 1 1 1 1 1 1",
+    ". . 1 . . 1 . 1"
+  ]
 
 -- Drum loop combined
 mDrum = sequence_ [mDrumA, mDrumA, mDrumA, mDrumAB, mDrumB, mDrumB]
 
 -- Drum intro
-mDrumIntroRaw = scoped $ do
+mDrumIntro' = scoped $ do
   music "1/2"
-  let kicks = inst iKick >> music "1 1 1 1 1 1 1 1"
-      toms = scoped $ music ". . . . 1/4"
-        >> mapM_ (\x -> inst (iTom x) >> music "1") [3, 2.5, 2, 1.5]
-      snares = scoped $ inst iSnare >> music ". . . . . . 1/4 1 1 1 1"
-      hats = scoped $ inst iHat >> music ". . . . 1/4 1 1 1 1 1 1 1 1"
-  kicks <:> toms <:> snares <:> hats
+  playDrums [iKick, iSnare, iHat] [
+      "1 1 1 1 1 1 1 1",
+      ". . . . . . 1/4 1 1 1 1",
+      ". . . . 1/4 1 1 1 1 1 1 1 1"
+    ] <:> (music ". . . . 1/4" >> mapM_ (\x -> inst (iTom x) >> music "1")
+      [3, 2.5, 2, 1.5])
 
 mDrumIntro = do
   music "12/1 ."
   t <- syncInst
   let env = mono . poly [(0, 0.5), (2 - 0.01, 1.5), (2, 0.7), (4, 1)]
-  reInst (\i -> t >>> ((const () ^>> i) &&& arr env) >>^ uncurry (*)) mDrumIntroRaw
+  reInst (\i -> t >>> ((const () ^>> i) &&& arr env) >>^ uncurry (*)) mDrumIntro'
 
 -- Main music arrangement
-theMusic = do
+mainMusic = do
   bpm 128
   key "Bb3"
   mode Minor
@@ -153,4 +154,4 @@ theMusic = do
   mLead <:> mPad <:> mBass <:> mDrum
   mLead <:> mPad <:> mBass <:> mDrum
 
-main = putWAVEFile "Example3.wav" $ toWav $ synth $ compileMusic theMusic
+main = putWAVEFile "Example3.wav" $ toWav $ synth $ compileMusic mainMusic
