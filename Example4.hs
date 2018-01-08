@@ -28,21 +28,20 @@ iLead = proc () -> do
 -- Lead music
 mLead = scoped $ do
   inst iLead
-  -- Define rhythm patterns
-  let rhythmA = rhythm "1/1 1/2 1/1 1/2 [] []"
+  let -- Define rhythm patterns
+      rhythmA = rhythm "1/1 1/2 1/1 1/2 [] []"
       rhythmB = rhythm "1/1 1/1 2/1"
       rhythmC = rhythm "2/1 1/1 1/1"
       rhythmD = rhythm "3/2 3/2 2/2"
-  -- Oblique motion
-      oblique r n m = r (musics m) <:> r (repeat $ scoped $ music n)
-  -- Parallel thirds
+      -- Parallel thirds
       par3 x = x <:> diatonicTranspose (-2) x
-  rhythmA $ musics "[v6] 6 6 6 5 6"
-  rhythmA $ musics "7 [^1] 2 1 [v7] 4"
-  music "8/1 5"
-  rhythmA $ musics "6 6 6 6 5 6"
-  rhythmA $ musics "7 [^1] 2 4 5 4"
-  music "4/1 5 3/1 ^1 1/1 v7"
+      oblique r n m = r (musics m) <:> r (repeat $ scoped $ music n)
+      -- Melody patterns
+      melodyA x = do
+        rhythmA $ musics "6 6 6 6 5 6"
+        rhythmA $ musics $ "7 [^1] 2 " ++ x
+  music "v"; melodyA "1 [v7] 4"; music "8/1 5"
+  melodyA "4 5 4"; music "4/1 5 3/1 ^1 1/1 v7"
   par3 $ rhythmA $ musics "[^1] 1 1 1 2 1"
   par3 $ rhythmB $ musics "2 3 4"
   oblique rhythmA "v#7" "5 6 5 4 3 2"
